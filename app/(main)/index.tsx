@@ -83,7 +83,8 @@ export default function Dashboard() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000' },
+  screen: { flex: 1, backgroundColor: '#000', 
+    paddingTop: 40 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'flex-start', paddingHorizontal: 16, paddingBottom: 10,

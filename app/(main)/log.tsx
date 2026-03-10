@@ -5,12 +5,12 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useStore } from '../store/index'
-import type { SessionEntry, Exercise } from '../store/index'
-import IconBtn from '../components/log/IconBtn'
-import EntryCard from '../components/log/EntryCard'
-import ExercisePickerSheet from '../components/log/ExercisePickerSheet'
-import { ACCENT, CARD, BORDER, MUTED, DIM } from '../constants/theme'
+import { useStore } from '@/store/index'
+import type { SessionEntry, Exercise } from '@/store/index'
+import IconBtn from '@/components/log/IconBtn'
+import EntryCard from '@/components/log/EntryCard'
+import ExercisePickerSheet from '@/components/log/ExercisePickerSheet'
+import { ACCENT, CARD, BORDER, MUTED, DIM } from '@/constants/theme'
 
 type DraftSet = { reps: string; weight: string }
 type DraftEntry = { exercise: Exercise; sets: DraftSet[] }

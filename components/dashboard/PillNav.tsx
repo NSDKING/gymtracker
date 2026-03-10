@@ -1,18 +1,16 @@
 import React from 'react'
 import { ScrollView, TouchableOpacity, Text, StyleSheet } from 'react-native'
 import { usePathname, router } from 'expo-router'
-
-const ACCENT = '#C8F065'
-const CARD = '#1a1a1a'
-const BORDER = '#2a2a2a'
-const MUTED = '#8e8e93'
+import { Ionicons } from '@expo/vector-icons'
+import { CARD, BORDER, MUTED, ACCENT } from '../../constants/theme'
+ 
 
 const PAGES = [
-  { name: 'index', label: 'Home', route: '/(main)/' },
-  { name: 'history', label: 'History', route: '/(main)/history' },
-  { name: 'stats', label: 'Stats', route: '/(main)/stats' },
-  { name: 'profile', label: 'Profile', route: '/(main)/profile' },
-]
+  { name: 'index', label: 'Home', icon: 'home-outline', route: '/(main)/' },
+  { name: 'history', label: 'History', icon: 'time-outline', route: '/(main)/history' },
+  { name: 'stats', label: 'Stats', icon: 'bar-chart-outline', route: '/(main)/stats' },
+  { name: 'profile', label: 'Profile', icon: 'person-outline', route: '/(main)/profile' },
+] as const
 
 export default function PillNav() {
   const pathname = usePathname()
@@ -34,6 +32,11 @@ export default function PillNav() {
             activeOpacity={0.7}
             style={[styles.pill, active && styles.pillActive]}
           >
+            <Ionicons
+              name={page.icon}
+              size={18}
+              color={active ? ACCENT : MUTED}
+            />
             <Text style={[styles.text, active && styles.textActive]}>
               {page.label}
             </Text>
@@ -50,7 +53,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingBottom: 12,
   },
   pill: {
-    paddingVertical: 14, paddingHorizontal: 22,
+    flexDirection: "row", alignItems: 'center', gap: 6,
+    paddingVertical: 11, paddingHorizontal: 22,
     borderRadius: 999, borderWidth: 1,
     borderColor: BORDER, backgroundColor: CARD,
   },

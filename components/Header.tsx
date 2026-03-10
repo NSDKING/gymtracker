@@ -1,19 +1,21 @@
 import React from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { ScrollView, TouchableOpacity, Text, StyleSheet, View } from 'react-native'
 import { usePathname, router } from 'expo-router'
-
+import { Ionicons } from '@expo/vector-icons'
+import { CARD, BORDER, MUTED, ACCENT } from '@/constants/theme'
+ 
 type Props = {
   title: string
   subtitle?: string
   right?: React.ReactNode
 }
 
-const pages = [
-  { name: 'index', label: 'Home', route: '/(main)/' },
-  { name: 'history', label: 'History', route: '/(main)/history' },
-  { name: 'stats', label: 'Stats', route: '/(main)/stats' },
-  { name: 'profile', label: 'Profile', route: '/(main)/profile' },
-]
+const PAGES = [
+  { name: 'index', label: 'Home', icon: 'home-outline', route: '/(main)/' },
+  { name: 'history', label: 'History', icon: 'time-outline', route: '/(main)/history' },
+  { name: 'stats', label: 'Stats', icon: 'bar-chart-outline', route: '/(main)/stats' },
+  { name: 'profile', label: 'Profile', icon: 'person-outline', route: '/(main)/profile' },
+] as const
 
 export default function Header({ title, subtitle, right }: Props) {
   const pathname = usePathname()
@@ -38,7 +40,7 @@ export default function Header({ title, subtitle, right }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.pillRow}
       >
-        {pages.map((page) => {
+        {PAGES.map((page) => {
           const active = isActive(page.name)
           return (
             <TouchableOpacity
@@ -47,7 +49,12 @@ export default function Header({ title, subtitle, right }: Props) {
               activeOpacity={0.7}
               style={[styles.pill, active && styles.pillActive]}
             >
-              <Text style={[styles.pillText, active && styles.pillTextActive]}>
+            <Ionicons
+              name={page.icon}
+              size={18}
+              color={active ? ACCENT : MUTED}
+            />
+            <Text style={[styles.text, active && styles.textActive]}>
                 {page.label}
               </Text>
             </TouchableOpacity>
@@ -60,9 +67,9 @@ export default function Header({ title, subtitle, right }: Props) {
 
 const styles = StyleSheet.create({
   wrap: {
-    paddingTop: 52,
+    paddingTop: 100,
     paddingHorizontal: 16,
-  },
+   },
   titleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -89,24 +96,20 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingBottom: 12,
   },
+  row: {
+    flexDirection: 'row', gap: 6,
+    paddingHorizontal: 16, paddingBottom: 12,
+  },
   pill: {
-    paddingVertical: 14,
-    paddingHorizontal: 22,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
-    backgroundColor: '#1a1a1a',
+    flexDirection: "row", alignItems: 'center', gap: 6,
+    paddingVertical: 11, paddingHorizontal: 22,
+    borderRadius: 999, borderWidth: 1,
+    borderColor: BORDER, backgroundColor: CARD,
   },
   pillActive: {
     backgroundColor: 'rgba(200,240,101,0.1)',
     borderColor: 'rgba(200,240,101,0.3)',
   },
-  pillText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#8e8e93',
-  },
-  pillTextActive: {
-    color: '#C8F065',
-  },
+  text: { fontSize: 16, fontWeight: '500', color: MUTED },
+  textActive: { color: ACCENT },
 })
