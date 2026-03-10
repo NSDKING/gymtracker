@@ -70,14 +70,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: {
-    fontSize: 30,
+    fontSize: 40,
     fontWeight: '800',
     color: '#ffffff',
     letterSpacing: -0.6,
-    lineHeight: 34,
+    lineHeight: 44,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#8e8e93',
     marginTop: 4,
   },
@@ -90,8 +90,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   pill: {
-    paddingVertical: 7,
-    paddingHorizontal: 13,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#2a2a2a',
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(200,240,101,0.3)',
   },
   pillText: {
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '500',
     color: '#8e8e93',
   },

@@ -1,1 +1,8 @@
- 
+export const ACCENT = '#C8F065'
+export const CARD = '#1a1a1a'
+export const BORDER = '#2a2a2a'
+export const MUTED = '#8e8e93'
+export const DIM = '#3a3a3c'
+export const RED = '#ff453a'
+export const ORANGE = '#ff9f0a'
+export const BG = '#000000'
