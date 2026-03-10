@@ -1,14 +1,10 @@
 import React from 'react'
-import { View, Text, StyleSheet } from 'react-native'
-
-const ACCENT = '#C8F065'
-const CARD = '#1a1a1a'
-const BORDER = '#2a2a2a'
-const MUTED = '#8e8e93'
-const DIM = '#3a3a3c'
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
+import { router } from 'expo-router'
+import { ACCENT, CARD, BORDER, MUTED, DIM } from '../../constants/theme'
 
 type PR = {
-  exercise: { name: string } | undefined
+  exercise: { id: string; name: string } | undefined
   weight: number
   date: string
 }
@@ -22,7 +18,12 @@ export default function PRList({ prs }: { prs: PR[] }) {
         </View>
       ) : (
         prs.map((pr, i) => (
-          <View key={i} style={[styles.row, i < prs.length - 1 && styles.rowBorder]}>
+          <TouchableOpacity
+            key={i}
+            style={[styles.row, i < prs.length - 1 && styles.rowBorder]}
+            activeOpacity={0.7}
+            onPress={() => pr.exercise && router.push(`/exercise/${pr.exercise.id}`)}
+          >
             <View>
               <Text style={styles.name}>{pr.exercise?.name}</Text>
               <Text style={styles.date}>
@@ -34,7 +35,7 @@ export default function PRList({ prs }: { prs: PR[] }) {
             <View style={styles.badge}>
               <Text style={styles.badgeText}>⚡ {pr.weight} kg</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         ))
       )}
     </View>

@@ -5,15 +5,13 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '@/store/index'
 import type { SessionEntry, Exercise } from '@/store/index'
-import IconBtn from '@/components/log/IconBtn'
 import EntryCard from '@/components/log/EntryCard'
+import type { DraftSet, DraftEntry } from '@/components/log/EntryCard'
 import ExercisePickerSheet from '@/components/log/ExercisePickerSheet'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '@/constants/theme'
-
-type DraftSet = { reps: string; weight: string }
-type DraftEntry = { exercise: Exercise; sets: DraftSet[] }
 
 export default function LogScreen() {
   const insets = useSafeAreaInsets()
@@ -29,26 +27,40 @@ export default function LogScreen() {
       Alert.alert('Already added', `${ex.name} is already in this session.`)
       return
     }
-    setEntries((prev) => [...prev, { exercise: ex, sets: [{ reps: '', weight: '' }] }])
+    setEntries((prev) => [
+      ...prev,
+      { exercise: ex, sets: [{ sets: '1', reps: '', weight: '' }] }
+    ])
     setShowPicker(false)
   }
 
-  const removeEntry = (i: number) => setEntries((prev) => prev.filter((_, idx) => idx !== i))
+  const removeEntry = (i: number) =>
+    setEntries((prev) => prev.filter((_, idx) => idx !== i))
 
   const addSet = (ei: number) =>
     setEntries((prev) =>
-      prev.map((e, i) => i === ei ? { ...e, sets: [...e.sets, { reps: '', weight: '' }] } : e)
+      prev.map((e, i) =>
+        i === ei
+          ? { ...e, sets: [...e.sets, { sets: '1', reps: '', weight: '' }] }
+          : e
+      )
     )
 
   const removeSet = (ei: number, si: number) =>
     setEntries((prev) =>
-      prev.map((e, i) => i === ei ? { ...e, sets: e.sets.filter((_, j) => j !== si) } : e)
+      prev.map((e, i) =>
+        i === ei ? { ...e, sets: e.sets.filter((_, j) => j !== si) } : e
+      )
     )
 
-  const updateSet = (ei: number, si: number, field: 'reps' | 'weight', val: string) =>
+  const updateSet = (
+    ei: number, si: number, field: 'sets' | 'reps' | 'weight', val: string
+  ) =>
     setEntries((prev) =>
       prev.map((e, i) =>
-        i === ei ? { ...e, sets: e.sets.map((s, j) => j === si ? { ...s, [field]: val } : s) } : e
+        i === ei
+          ? { ...e, sets: e.sets.map((s, j) => j === si ? { ...s, [field]: val } : s) }
+          : e
       )
     )
 
@@ -61,25 +73,50 @@ export default function LogScreen() {
       exerciseId: e.exercise.id,
       sets: e.sets
         .filter((s) => s.reps !== '' || s.weight !== '')
-        .map((s) => ({ reps: Number(s.reps) || 0, weight: Number(s.weight) || 0 })),
+        .flatMap((s) =>
+          Array.from({ length: Number(s.sets) || 1 }, () => ({
+            reps: Number(s.reps) || 0,
+            weight: Number(s.weight) || 0,
+          }))
+        ),
     }))
+    
     const sessionId = Date.now().toString()
     addSession({ id: sessionId, date, entries: sessionEntries, note })
     router.replace(`/session/${sessionId}`)
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <View style={{ gap: 2 }}>
+    <View style={styles.screen}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity
+          onPress={() => router.dismiss()}
+          style={styles.backBtn}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={20} color="#fff" />
+        </TouchableOpacity>
+
+        <View style={{ flex: 1, alignItems: 'center' }}>
           <Text style={styles.headerTitle}>Log Session</Text>
           <Text style={styles.headerSub}>
-            {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+            {new Date().toLocaleDateString('en-GB', {
+              weekday: 'short', day: 'numeric', month: 'short',
+            })}
           </Text>
         </View>
-        <IconBtn onPress={() => router.dismiss()} label="✕" variant="danger" />
+
+        <TouchableOpacity
+          onPress={() => router.dismiss()}
+          style={styles.closeBtn}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={16} color="#ff453a" />
+        </TouchableOpacity>
       </View>
 
+      {/* Entries */}
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 14, paddingBottom: 120 }}
@@ -110,7 +147,8 @@ export default function LogScreen() {
           onPress={() => setShowPicker(true)}
           activeOpacity={0.7}
         >
-          <Text style={styles.addExBtnText}>+ Add Exercise</Text>
+          <Ionicons name="add" size={16} color={MUTED} />
+          <Text style={styles.addExBtnText}>Add Exercise</Text>
         </TouchableOpacity>
 
         <Text style={styles.fieldLabel}>Notes (optional)</Text>
@@ -124,6 +162,7 @@ export default function LogScreen() {
         />
       </ScrollView>
 
+      {/* Save */}
       <View style={[styles.saveWrap, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity
           style={[styles.saveBtn, entries.length === 0 && styles.saveBtnDisabled]}
@@ -138,6 +177,7 @@ export default function LogScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Picker overlay */}
       {showPicker && (
         <View style={StyleSheet.absoluteFill}>
           <TouchableOpacity
@@ -158,27 +198,44 @@ export default function LogScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000' },
+
   header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingBottom: 14,
     borderBottomWidth: 1, borderBottomColor: CARD,
   },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.4 },
-  headerSub: { fontSize: 11, color: MUTED },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.4 },
+  headerSub: { fontSize: 11, color: MUTED, marginTop: 2 },
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  closeBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(255,69,58,0.15)',
+    borderWidth: 1, borderColor: 'rgba(255,69,58,0.3)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
   empty: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyIcon: { fontSize: 36 },
   emptyText: { fontSize: 13, color: DIM, textAlign: 'center' },
+
   addExBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed',
-    borderRadius: 13, height: 48,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+    borderRadius: 13, height: 48, marginBottom: 14,
   },
   addExBtnText: { fontSize: 14, color: MUTED, fontWeight: '500' },
+
   fieldLabel: { fontSize: 11, color: MUTED, marginBottom: 7, fontWeight: '500' },
   noteInput: {
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
     borderRadius: 11, padding: 12, color: '#fff', fontSize: 14, minHeight: 48,
   },
+
   saveWrap: {
     paddingHorizontal: 14, paddingTop: 12,
     borderTopWidth: 1, borderTopColor: CARD, backgroundColor: '#000',
@@ -189,5 +246,6 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { fontSize: 15, fontWeight: '700', color: '#000' },
+
   overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.75)' },
 })

@@ -46,9 +46,7 @@ export default function Dashboard() {
           <Text style={styles.title}>Dashboard</Text>
           <Text style={styles.sub}>{monthLabel}</Text>
         </View>
-        <TouchableOpacity style={styles.iconBtn} activeOpacity={0.7}>
-          <Text style={styles.iconBtnText}>⌕</Text>
-        </TouchableOpacity>
+   
       </View>
 
       <PillNav />
