@@ -1,13 +1,13 @@
 import React, { useState } from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Header from '../../components/Header'
-import AllTimeStats from '../../components/stats/AllTimeStats'
-import WeeklyVolume from '../../components/stats/WeeklyVolume'
-import ExerciseProgress from '../../components/stats/ExerciseProgress'
-import MuscleBreakdown from '../../components/stats/MuscleBreakdown'
-import { useStore, getTotalVolume } from '../../store/index'
-import { MUTED } from '../../constants/theme'
+import Header from '@/components/Header'
+import AllTimeStats from '@/components/stats/AllTimeStats'
+import WeeklyVolume from '@/components/stats/WeeklyVolume'
+import ExerciseProgress from '@/components/stats/ExerciseProgress'
+import MuscleBreakdown from '@/components/stats/MuscleBreakdown'
+import { useStore, getTotalVolume } from '@/store/index'
+import { MUTED } from '@/constants/theme'
 
 export default function StatsScreen() {
   const insets = useSafeAreaInsets()

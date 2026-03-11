@@ -1,10 +1,10 @@
 import React from 'react'
 import { View, Text, ScrollView, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Header from '../../components/Header'
-import SessionCard from '../../components/history/SessionCard'
-import { useStore } from '../../store/index'
-import { CARD, BORDER, MUTED, DIM } from '../../constants/theme'
+import Header from '@/components/Header'
+import SessionCard from '@/components/history/SessionCard'
+import { useStore } from '@/store/index'
+import { CARD, BORDER, MUTED, DIM } from '@/constants/theme'
 import Heatmap from '@/components/Heatmap'
 
 export default function HistoryScreen() {
