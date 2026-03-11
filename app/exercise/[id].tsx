@@ -23,6 +23,8 @@ function filterByRange(data: { date: string; weight: number }[], range: Range) {
   return data.filter((d) => new Date(d.date) >= cutoff)
 }
 
+// ─── PROGRESS CHART ───────────────────────────────────────────────────────────
+
 function ProgressChart({ points, height = 88 }: { points: { date: string; weight: number }[]; height?: number }) {
   if (points.length < 2) {
     return (
@@ -154,7 +156,6 @@ function EditSessionModal({ visible, sessionId, exerciseId, initialSets, onSave,
             </TouchableOpacity>
           </View>
 
-          {/* Column headers */}
           <View style={styles.editSetHeader}>
             <View style={{ width: 28 }} />
             <Text style={[styles.editSetHeaderText, { flex: 1 }]}>REPS</Text>
@@ -244,11 +245,11 @@ export default function ExerciseDetailScreen() {
   }
 
   const exerciseSessions = sessions
-    .filter((s) => s.entries.some((e) => e.exerciseId === id))
+    .filter((s) => s.entries.some((e) => e.exercise.id === id))
     .sort((a, b) => a.date.localeCompare(b.date))
 
   const allProgress = exerciseSessions.map((s) => {
-    const entry = s.entries.find((e) => e.exerciseId === id)!
+    const entry = s.entries.find((e) => e.exercise.id === id)!
     return { date: s.date, weight: Math.max(...entry.sets.map((set) => set.weight)) }
   })
 
@@ -257,21 +258,21 @@ export default function ExerciseDetailScreen() {
   const pr = prs[id]
 
   const lastSession = exerciseSessions[exerciseSessions.length - 1]
-  const lastEntry = lastSession?.entries.find((e) => e.exerciseId === id)
+  const lastEntry = lastSession?.entries.find((e) => e.exercise.id === id)
   const prevSession = exerciseSessions[exerciseSessions.length - 2]
-  const prevEntry = prevSession?.entries.find((e) => e.exerciseId === id)
+  const prevEntry = prevSession?.entries.find((e) => e.exercise.id === id)
   const prevMax = prevEntry ? Math.max(...prevEntry.sets.map((s) => s.weight)) : null
   const currentMax = lastEntry ? Math.max(...lastEntry.sets.map((s) => s.weight)) : null
   const delta = currentMax !== null && prevMax !== null ? currentMax - prevMax : null
 
   const totalSets = exerciseSessions.reduce((t, s) => {
-    const entry = s.entries.find((e) => e.exerciseId === id)
+    const entry = s.entries.find((e) => e.exercise.id === id)
     return t + (entry?.sets.length ?? 0)
   }, 0)
   const avgSetsPerSession = exerciseSessions.length
     ? (totalSets / exerciseSessions.length).toFixed(1) : '0'
   const bestVolSession = exerciseSessions.reduce((best, s) => {
-    const entry = s.entries.find((e) => e.exerciseId === id)
+    const entry = s.entries.find((e) => e.exercise.id === id)
     const vol = entry?.sets.reduce((t, set) => t + set.reps * set.weight, 0) ?? 0
     return vol > best ? vol : best
   }, 0)
@@ -312,7 +313,7 @@ export default function ExerciseDetailScreen() {
           ? {
               ...sess,
               entries: sess.entries.map((e) =>
-                e.exerciseId === exerciseId ? { ...e, sets: newSets } : e
+                e.exercise.id === exerciseId ? { ...e, sets: newSets } : e
               ),
             }
           : sess
@@ -322,7 +323,7 @@ export default function ExerciseDetailScreen() {
   }
 
   const openSessionMenu = (s: typeof exerciseSessions[0]) => {
-    const entry = s.entries.find((e) => e.exerciseId === id)!
+    const entry = s.entries.find((e) => e.exercise.id === id)!
     Alert.alert(
       new Date(s.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
       'What would you like to do?',
@@ -337,7 +338,7 @@ export default function ExerciseDetailScreen() {
             useStore.setState((st) => ({
               sessions: st.sessions.map((sess) =>
                 sess.id === s.id
-                  ? { ...sess, entries: sess.entries.filter((e) => e.exerciseId !== id) }
+                  ? { ...sess, entries: sess.entries.filter((e) => e.exercise.id !== id) }
                   : sess
               ).filter((sess) => sess.entries.length > 0)
             }))
@@ -387,7 +388,6 @@ export default function ExerciseDetailScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* Edit exercise modal */}
       <EditExerciseModal
         visible={showEdit}
         name={exercise.name}
@@ -396,7 +396,6 @@ export default function ExerciseDetailScreen() {
         onClose={() => setShowEdit(false)}
       />
 
-      {/* Edit session sets modal */}
       {editingSession && (
         <EditSessionModal
           visible={true}
@@ -512,7 +511,7 @@ export default function ExerciseDetailScreen() {
             </View>
             <View style={[styles.card, { padding: 0 }]}>
               {[...exerciseSessions].reverse().map((s, i) => {
-                const entry = s.entries.find((e) => e.exerciseId === id)!
+                const entry = s.entries.find((e) => e.exercise.id === id)!
                 const maxW = Math.max(...entry.sets.map((set) => set.weight))
                 const vol = entry.sets.reduce((t, set) => t + set.reps * set.weight, 0)
                 const isFirst = i === 0
@@ -558,7 +557,6 @@ export default function ExerciseDetailScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#000' },
-
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingVertical: 14,
@@ -581,7 +579,6 @@ const styles = StyleSheet.create({
     borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3,
   },
   badgeText: { fontSize: 11, color: MUTED },
-
   menuCard: {
     position: 'absolute', top: 80, right: 16,
     backgroundColor: '#1e1e1e', borderWidth: 1, borderColor: BORDER,
@@ -590,7 +587,6 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
   menuItemText: { fontSize: 14, fontWeight: '500', color: '#fff' },
   menuDivider: { height: 1, backgroundColor: BORDER },
-
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'center', alignItems: 'center',
@@ -626,8 +622,6 @@ const styles = StyleSheet.create({
     backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center',
   },
   modalBtnSaveText: { fontSize: 14, fontWeight: '700', color: '#000' },
-
-  // Session edit modal
   sessionModalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.85)',
     justifyContent: 'flex-end',
@@ -675,7 +669,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: BORDER, marginTop: 4,
   },
   addSetRowText: { fontSize: 13, color: ACCENT, fontWeight: '600' },
-
   prHero: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
@@ -693,25 +686,21 @@ const styles = StyleSheet.create({
     borderRadius: 13, margin: 14, padding: 20, alignItems: 'center',
   },
   noPrText: { fontSize: 13, color: DIM, textAlign: 'center' },
-
   sectionHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 14, paddingTop: 8, paddingBottom: 8,
   },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#fff', letterSpacing: -0.3 },
   sectionSub: { fontSize: 12, color: MUTED },
-
   rangeTabs: { flexDirection: 'row', gap: 3 },
   rangeTab: { paddingVertical: 4, paddingHorizontal: 9, borderRadius: 7 },
   rangeTabActive: { backgroundColor: 'rgba(200,240,101,0.1)' },
   rangeTabText: { fontSize: 11, fontWeight: '600', color: DIM },
   rangeTabTextActive: { color: ACCENT },
-
   card: {
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
     borderRadius: 13, marginHorizontal: 14, marginBottom: 8, padding: 13,
   },
-
   statsRow: { flexDirection: 'row', paddingHorizontal: 14, marginBottom: 8 },
   statCard: {
     flex: 1, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
@@ -719,7 +708,6 @@ const styles = StyleSheet.create({
   },
   statCardLabel: { fontSize: 9, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: MUTED, marginBottom: 6 },
   statCardValue: { fontSize: 22, fontWeight: '700', color: '#fff', letterSpacing: -0.5 },
-
   setHeaderRow: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: 13, paddingVertical: 8,
@@ -738,7 +726,6 @@ const styles = StyleSheet.create({
   setCellMuted: { color: MUTED },
   setWeightWrap: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
   prDot: { fontSize: 10 },
-
   historyRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', padding: 13,
@@ -749,7 +736,6 @@ const styles = StyleSheet.create({
   historyMax: { fontSize: 15, fontWeight: '700', color: '#fff' },
   historyLatest: { fontSize: 9, color: DIM, marginTop: 2 },
   longPressHint: { fontSize: 10, color: DIM, textAlign: 'center', paddingBottom: 8 },
-
   emptyChart: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#111', borderRadius: 8 },
   emptyChartText: { fontSize: 12, color: DIM, textAlign: 'center', paddingHorizontal: 16 },
   empty: { alignItems: 'center', paddingTop: 40, paddingHorizontal: 32 },

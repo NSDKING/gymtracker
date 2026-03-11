@@ -29,9 +29,9 @@ export default function StatsScreen() {
 
   // Exercise progress
   const exerciseProgress = sessions
-    .filter((s) => s.entries.some((e) => e.exerciseId === selectedExercise))
+    .filter((s) => s.entries.some((e) => e.exercise.id === selectedExercise))
     .map((s) => {
-      const entry = s.entries.find((e) => e.exerciseId === selectedExercise)
+      const entry = s.entries.find((e) => e.exercise.id === selectedExercise)
       return {
         date: s.date,
         weight: entry ? Math.max(...entry.sets.map((set) => set.weight)) : 0,
@@ -45,7 +45,7 @@ export default function StatsScreen() {
   const muscleVols: Record<string, number> = {}
   sessions.forEach((s) => {
     s.entries.forEach((e) => {
-      const ex = exercises.find((x) => x.id === e.exerciseId)
+      const ex = exercises.find((x) => x.id === e.exercise.id)
       if (!ex) return
       const vol = e.sets.reduce((t, set) => t + set.reps * set.weight, 0)
       muscleVols[ex.muscle] = (muscleVols[ex.muscle] || 0) + vol

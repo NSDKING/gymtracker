@@ -21,7 +21,7 @@ export default function ExercisePickerTab({ exercises, onPick }: Props) {
   const recentIds = Array.from(new Set(
     sessions
       .slice(-5)
-      .flatMap((s) => s.entries.map((e) => e.exerciseId))
+      .flatMap((s) => s.entries.map((e) => e.exercise.id))
   ))
   const recentExercises = recentIds
     .map((id) => exercises.find((e) => e.id === id))

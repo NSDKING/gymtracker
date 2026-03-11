@@ -70,7 +70,7 @@ export default function LogScreen() {
       return
     }
     const sessionEntries: SessionEntry[] = entries.map((e) => ({
-      exerciseId: e.exercise.id,
+      exercise: e.exercise,
       sets: e.sets
         .filter((s) => s.reps !== '' || s.weight !== '')
         .flatMap((s) =>
@@ -80,9 +80,8 @@ export default function LogScreen() {
           }))
         ),
     }))
-    
-    const sessionId = Date.now().toString()
-    addSession({ id: sessionId, date, entries: sessionEntries, note })
+
+    const sessionId = addSession({ date, entries: sessionEntries, note })
     router.replace(`/session/${sessionId}`)
   }
 

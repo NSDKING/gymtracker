@@ -47,19 +47,19 @@ export default function SessionSummaryScreen() {
   const sessionPRs = new Set(
     session.entries
       .filter((e) => {
-        const pr = prs[e.exerciseId]
+        const pr = prs[e.exercise.id]
         if (!pr) return false
         const sessionMax = Math.max(...e.sets.map((s) => s.weight))
         return sessionMax >= pr.weight && pr.date === session.date
       })
-      .map((e) => e.exerciseId)
+      .map((e) => e.exercise.id)
   )
 
   const exerciseBreakdown = session.entries.map((e) => {
-    const ex = exercises.find((x) => x.id === e.exerciseId)
+    const ex = exercises.find((x) => x.id === e.exercise.id)
     const vol = e.sets.reduce((t, s) => t + s.reps * s.weight, 0)
     const maxWeight = Math.max(...e.sets.map((s) => s.weight))
-    const isPR = sessionPRs.has(e.exerciseId)
+    const isPR = sessionPRs.has(e.exercise.id)
     return { ex, vol, sets: e.sets.length, maxWeight, isPR, sets_data: e.sets }
   })
 
