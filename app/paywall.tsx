@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, ScrollView
+  ActivityIndicator, Alert, ScrollView, Linking
 } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -17,6 +17,7 @@ const FEATURES = [
   { icon: '🤖', title: 'AI recommendations', desc: 'Claude analyzes your history and tells you what to train' },
   { icon: '💪', title: 'AI workout generator', desc: 'Get full workout plans built around your goals' },
   { icon: '📤', title: 'Export to CSV', desc: 'Download all your data anytime' },
+  { icon: '🔔', title: 'Smart notifications', desc: 'PR alerts and weekly training summaries' },
 ]
 
 export default function PaywallScreen() {
@@ -39,14 +40,15 @@ export default function PaywallScreen() {
     try {
       setPurchasing(true)
       const isPro = await purchasePackage(selected)
-      if (isPro){
+      if (isPro) {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
-            await pushLocalToSupabase()
-            useStore.getState().setSyncEnabled(true)
+          await pushLocalToSupabase()
+          useStore.getState().setSyncEnabled(true)
+          router.back()
         } else {
-            router.replace('/auth') // login first, sync happens after
-        } 
+          router.replace('/auth')
+        }
       }
     } catch (e: any) {
       if (!e.userCancelled) Alert.alert('Purchase failed', e.message)
@@ -90,7 +92,9 @@ export default function PaywallScreen() {
           ))}
         </View>
 
-        {loading ? <ActivityIndicator color={ACCENT} style={{ marginVertical: 24 }} /> : (
+        {loading ? (
+          <ActivityIndicator color={ACCENT} style={{ marginVertical: 24 }} />
+        ) : (
           <View style={styles.packages}>
             {packages.map(pkg => (
               <TouchableOpacity
@@ -104,6 +108,17 @@ export default function PaywallScreen() {
             ))}
           </View>
         )}
+
+        {/* Legal links */}
+        <View style={styles.legalRow}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://nsdking.github.io/repd-privacy/')}>
+            <Text style={styles.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalDot}>·</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
+            <Text style={styles.legalLink}>Terms of Use</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <View style={styles.bottom}>
@@ -143,6 +158,9 @@ const styles = StyleSheet.create({
   pkgSelected: { borderColor: ACCENT, backgroundColor: 'rgba(200,240,101,0.06)' },
   pkgTitle: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 3 },
   pkgPrice: { fontSize: 13, color: MUTED },
+  legalRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 8 },
+  legalLink: { fontSize: 12, color: MUTED, textDecorationLine: 'underline' },
+  legalDot: { fontSize: 12, color: DIM },
   bottom: { paddingHorizontal: 24, gap: 12 },
   ctaBtn: { backgroundColor: ACCENT, borderRadius: 13, height: 52, alignItems: 'center', justifyContent: 'center' },
   ctaTxt: { fontSize: 16, fontWeight: '800', color: '#000' },

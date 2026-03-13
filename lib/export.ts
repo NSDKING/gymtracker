@@ -1,10 +1,9 @@
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
-import { Session } from '../store'
+import { Session, Exercise } from '../store'
 
-export async function exportToCSV(sessions: Session[]) {
+export async function exportToCSV(sessions: Session[], exercises: Exercise[]) {
   const rows: string[] = []
-
   rows.push('Date,Exercise,Muscle,Set,Reps,Weight (kg),Volume (kg)')
 
   for (const session of sessions) {
@@ -26,10 +25,10 @@ export async function exportToCSV(sessions: Session[]) {
 
   const csv = rows.join('\n')
   const filename = `repd-export-${new Date().toISOString().slice(0, 10)}.csv`
-  const uri = FileSystem.Paths.document.uri + filename
+  const uri = FileSystem.Paths.document.uri + '/' + filename
 
   const file = new FileSystem.File(uri)
-  file.write(csv)
+  await file.write(csv)
 
   const canShare = await Sharing.isAvailableAsync()
   if (!canShare) throw new Error('Sharing not available on this device')

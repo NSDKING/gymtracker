@@ -1,33 +1,26 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-
+ 
 export type Exercise = { id: string; name: string; muscle: string }
 export type SetEntry = { reps: number; weight: number }
 export type SessionEntry = { exercise: Exercise; sets: SetEntry[] }
 export type Session = { id: string; date: string; note: string; entries: SessionEntry[] }
 
 type Store = {
-  // Data
   exercises: Exercise[]
   sessions: Session[]
   goal: string
   daysPerWeek: number
-
-  // Pro
   isPro: boolean
   isLoggedIn: boolean
   syncEnabled: boolean
-
-  // Local actions
   addExercise: (name: string, muscle: string) => Exercise
   editExercise: (id: string, name: string, muscle: string) => void
   removeExercise: (id: string) => void
   addSession: (session: Omit<Session, 'id'>) => string
   removeSession: (id: string) => void
   editSessionSets: (sessionId: string, exerciseId: string, sets: SetEntry[]) => void
-
-  // Pro actions
   setIsPro: (v: boolean) => void
   setIsLoggedIn: (v: boolean) => void
   setSyncEnabled: (v: boolean) => void
@@ -39,7 +32,7 @@ const uuid = () => Math.random().toString(36).slice(2) + Date.now().toString(36)
 
 export const useStore = create<Store>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       exercises: [],
       sessions: [],
       goal: 'Build Muscle',
@@ -61,9 +54,26 @@ export const useStore = create<Store>()(
         set(s => ({ exercises: s.exercises.filter(e => e.id !== id) })),
 
       addSession: (session) => {
+        const state = get()
         const id = uuid()
-        const full = { ...session, id }
-        set(s => ({ sessions: [full, ...s.sessions] }))
+        const newSession: Session = { ...session, id }
+        const newSessions = [...state.sessions, newSession]
+
+        // Check for new PRs
+        const oldPRs = getPRs(state.sessions, state.exercises)
+        const newPRs = getPRs(newSessions, state.exercises)
+
+        for (const [exerciseId, newPR] of Object.entries(newPRs)) {
+          const oldPR = oldPRs[exerciseId]
+          if (!oldPR || newPR.weight > oldPR.weight) {
+            const exercise = state.exercises.find(e => e.id === exerciseId)
+            if (exercise && state.isPro) {
+            //sendPRNotification(exercise.name, newPR.weight)
+            }
+          }
+        }
+
+        set({ sessions: newSessions })
         return id
       },
 
@@ -95,8 +105,6 @@ export const useStore = create<Store>()(
   )
 )
 
-// ─── Selectors / helpers ─────────────────────────────────────
-
 export function getTotalVolume(entries: SessionEntry[]): number {
   return entries.reduce((total, entry) =>
     total + entry.sets.reduce((s, set) => s + set.reps * set.weight, 0), 0
@@ -105,14 +113,11 @@ export function getTotalVolume(entries: SessionEntry[]): number {
 
 export function getStreak(sessions: Session[]): number {
   if (sessions.length === 0) return 0
-
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-
   const trainedDates = new Set(sessions.map(s => s.date))
   let streak = 0
   const cursor = new Date(today)
-
   while (true) {
     const dateStr = cursor.toISOString().slice(0, 10)
     if (trainedDates.has(dateStr)) {
@@ -128,7 +133,6 @@ export function getStreak(sessions: Session[]): number {
       }
     }
   }
-
   return streak
 }
 
@@ -137,7 +141,6 @@ export function getPRs(
   exercises: Exercise[]
 ): Record<string, { weight: number; date: string }> {
   const prs: Record<string, { weight: number; date: string }> = {}
-
   for (const session of sessions) {
     for (const entry of session.entries) {
       const maxWeight = Math.max(...entry.sets.map(s => s.weight), 0)
@@ -148,6 +151,5 @@ export function getPRs(
       }
     }
   }
-
   return prs
 }

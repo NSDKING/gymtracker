@@ -2,11 +2,12 @@
   "expo": {
     "name": "Repd",
     "slug": "repd",
-    "version": "1.0.0",
+    "version": "1.3.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "scheme": "repd",
+    "icon": "./assets/images/iconV1.png",
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/images/splashV1.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
@@ -14,23 +15,20 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.yourname.repd",
       "usesAppleSignIn": true,
+        "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
+      
     },
+    "android": {
+      "package": "com.yourname.repd"
+    },
+    "owner": "dimis",
     "extra": {
       "eas": {
         "projectId": "93bab97e-1442-460d-a1ef-4cd08a6a04a9"
       }
-    },
-    "expo": {
-    "plugins": [
-      "react-native-purchases"
-    ]
-  },
-    "owner": "dimis",
-    "android": {
-      "package": "com.yourname.repd"
     }
   }
 }

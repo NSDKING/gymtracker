@@ -8,8 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '../constants/theme'
 import { checkProStatus } from '@/lib/revenue-cat'
 import { pullFromSupabase } from '@/lib/sync'
-import { router } from '@/.expo/types/router'
-import { useStore } from '@/store'
+ import { useStore } from '@/store'
+import { router } from 'expo-router'
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets()
