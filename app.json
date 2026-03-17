@@ -15,8 +15,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.yourname.repd",
       "usesAppleSignIn": true,
-        "buildNumber": "4",
-      "infoPlist": {
+       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
       

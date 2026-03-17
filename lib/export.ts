@@ -1,5 +1,4 @@
 import * as FileSystem from 'expo-file-system'
-import * as Sharing from 'expo-sharing'
 import { Session, Exercise } from '../store'
 
 export async function exportToCSV(sessions: Session[], exercises: Exercise[]) {
@@ -30,6 +29,8 @@ export async function exportToCSV(sessions: Session[], exercises: Exercise[]) {
   const file = new FileSystem.File(uri)
   await file.write(csv)
 
+  // Lazy load sharing to avoid native module crash on import
+  const Sharing = await import('expo-sharing')
   const canShare = await Sharing.isAvailableAsync()
   if (!canShare) throw new Error('Sharing not available on this device')
 
