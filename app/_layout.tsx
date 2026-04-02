@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import type { Session as SupaSession } from '@supabase/supabase-js'
 import { initRevenueCat, checkProStatus } from '@/lib/revenue-cat'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { pullFromSupabase } from '@/lib/sync'
+import { syncWithSupabase } from '@/lib/sync'
 import { useStore } from '@/store/index'
 
 SplashScreen.preventAutoHideAsync()
@@ -23,26 +23,18 @@ export default function RootLayout() {
         const { data: { session: currentSession } } = await supabase.auth.getSession()
         setSession(currentSession)
 
-        // 2. Initialize RevenueCat
+        // 2. Initialize RevenueCat + sync in background (non-blocking)
         initRevenueCat()
-        
-        // 3. Check Subscription Status (Paid Feature Guard)
-        const isPro = await checkProStatus()
-        // Save pro status to Zustand so other screens can use it (e.g., to hide ads or show pro badges)
-        useStore.setState({ isPro })
-
-        // 4. Automatic Cloud Sync (Only for Paid Users)
-        if (currentSession && isPro) {
-          try {
-            // This is what pulls Dimitri's data from the cloud into the app
-            await pullFromSupabase()
-            console.log("💎 Pro Sync: Cloud data hydrated.")
-          } catch (syncError) {
-            console.error("Auto-sync failed:", syncError)
+        checkProStatus().then(async (isPro) => {
+          useStore.setState({ isPro })
+          if (currentSession && isPro) {
+            try {
+              await syncWithSupabase()
+            } catch (syncError) {
+              console.error("Auto-sync failed:", syncError)
+            }
           }
-        } else {
-          console.log(currentSession ? "👤 Free Tier: Sync skipped." : "🚪 No session: Sync skipped.")
-        }
+        }).catch((e) => console.warn("RevenueCat init failed:", e))
 
         // 5. Check if Onboarding is complete
         const onboardingComplete = await AsyncStorage.getItem('onboardingComplete')
@@ -66,7 +58,7 @@ export default function RootLayout() {
         // Re-check pro status on login to trigger sync immediately if they are Pro
         const isPro = await checkProStatus()
         useStore.setState({ isPro })
-        if (isPro) await pullFromSupabase()
+        if (isPro) await syncWithSupabase()
       }
 
       if (event === 'SIGNED_OUT') {

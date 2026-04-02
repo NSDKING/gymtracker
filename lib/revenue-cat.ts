@@ -4,14 +4,6 @@ import { Platform } from 'react-native'
 
 export function initRevenueCat() {
   if (Platform.OS !== 'ios') return
-  
-  const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
-  
-  if (!apiKey) {
-    console.error("RevenueCat: API Key is missing! Check your environment variables.");
-    return; // Stop here instead of crashing
-  }
-
   Purchases.setLogLevel(LOG_LEVEL.WARN)
   Purchases.configure({ apiKey: "appl_WhBTpOynKphXkbILxQAelKgIYpE" })
 }

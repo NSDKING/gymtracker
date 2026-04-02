@@ -1,60 +1,49 @@
 import { supabase } from './supabase'
 import { useStore, Session, Exercise } from '../store'
 
-// Push all local data to Supabase (called once when user first upgrades)
-export async function pushLocalToSupabase() {
-  const { exercises, sessions } = useStore.getState()
+// Merge local + cloud data by ID (union, no duplicates, no data loss)
+export async function syncWithSupabase() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not logged in')
 
-  // Upsert exercises
-  if (exercises.length > 0) {
-    const { error } = await supabase.from('exercises').upsert(
-      exercises.map(e => ({ id: e.id, name: e.name, muscle: e.muscle, user_id: user.id })),
+  const { exercises: localExercises, sessions: localSessions } = useStore.getState()
+
+  // --- Push local exercises ---
+  if (localExercises.length > 0) {
+    await supabase.from('exercises').upsert(
+      localExercises.map(e => ({ id: e.id, name: e.name, muscle: e.muscle, user_id: user.id })),
       { onConflict: 'id' }
     )
-    if (error) throw error
   }
 
-  // Upsert sessions + entries + sets
-  for (const session of sessions) {
-    const { error: sErr } = await supabase.from('sessions').upsert(
+  // --- Push local sessions ---
+  for (const session of localSessions) {
+    await supabase.from('sessions').upsert(
       { id: session.id, user_id: user.id, date: session.date, note: session.note },
       { onConflict: 'id' }
     )
-    if (sErr) throw sErr
-
     for (const entry of session.entries) {
       const entryId = `${session.id}_${entry.exercise.id}`
-      const { error: eErr } = await supabase.from('session_entries').upsert(
+      await supabase.from('session_entries').upsert(
         { id: entryId, session_id: session.id, exercise_id: entry.exercise.id },
         { onConflict: 'id' }
       )
-      if (eErr) throw eErr
-
       if (entry.sets.length > 0) {
         await supabase.from('sets').delete().eq('entry_id', entryId)
-        const { error: setErr } = await supabase.from('sets').insert(
+        await supabase.from('sets').insert(
           entry.sets.map(s => ({ entry_id: entryId, reps: s.reps, weight: s.weight }))
         )
-        if (setErr) throw setErr
       }
     }
   }
-}
 
-// Pull Supabase data and replace local store (called on login on new device)
-export async function pullFromSupabase() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not logged in')
-
-  const { data: exercises, error: exErr } = await supabase
+  // --- Pull cloud data ---
+  const { data: cloudExercises } = await supabase
     .from('exercises')
     .select('*')
     .order('name')
-  if (exErr) throw exErr
 
-  const { data: sessions, error: sErr } = await supabase
+  const { data: cloudSessions } = await supabase
     .from('sessions')
     .select(`
       id, date, note,
@@ -65,24 +54,50 @@ export async function pullFromSupabase() {
     `)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-  if (sErr) throw sErr
 
-  const exMap = Object.fromEntries(exercises.map(e => [e.id, e]))
+  if (!cloudExercises || !cloudSessions) return
 
-  const mappedSessions: Session[] = sessions.map(s => ({
-    id: s.id,
-    date: s.date,
-    note: s.note,
-    entries: (s.session_entries as any[]).map(entry => ({
-      exercise: exMap[entry.exercise_id] ?? { id: entry.exercise_id, name: 'Unknown', muscle: '' },
-      sets: (entry.sets as any[]).map((set: any) => ({ reps: set.reps, weight: set.weight })),
-    })),
-  }))
+  // --- Merge exercises: union by ID ---
+  const localExMap = Object.fromEntries(localExercises.map(e => [e.id, e]))
+  const mergedExercises: Exercise[] = [...localExercises]
+  for (const ce of cloudExercises) {
+    if (!localExMap[ce.id]) {
+      mergedExercises.push({ id: ce.id, name: ce.name, muscle: ce.muscle })
+    }
+  }
 
-  // Replace local store with cloud data
+  const exMap = Object.fromEntries(mergedExercises.map(e => [e.id, e]))
+
+  // --- Merge sessions: union by ID ---
+  const localSessionMap = Object.fromEntries(localSessions.map(s => [s.id, s]))
+  const mergedSessions: Session[] = [...localSessions]
+  for (const cs of cloudSessions) {
+    if (!localSessionMap[cs.id]) {
+      mergedSessions.push({
+        id: cs.id,
+        date: cs.date,
+        note: cs.note,
+        entries: (cs.session_entries as any[]).map(entry => ({
+          exercise: exMap[entry.exercise_id] ?? { id: entry.exercise_id, name: 'Unknown', muscle: '' },
+          sets: (entry.sets as any[]).map((set: any) => ({ reps: set.reps, weight: set.weight })),
+        })),
+      })
+    }
+  }
+
   useStore.setState({
-    exercises: exercises.map(e => ({ id: e.id, name: e.name, muscle: e.muscle })),
-    sessions: mappedSessions,
+    exercises: mergedExercises,
+    sessions: mergedSessions,
     syncEnabled: true,
   })
+}
+
+// Keep for backwards compatibility (used on sign-in)
+export async function pullFromSupabase() {
+  return syncWithSupabase()
+}
+
+// Push all local data to Supabase (called once when user first upgrades)
+export async function pushLocalToSupabase() {
+  return syncWithSupabase()
 }
