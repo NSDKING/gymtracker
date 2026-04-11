@@ -121,6 +121,41 @@ const handleWeeklySummary = async (val: boolean) => {
     ])
   }
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all associated data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account', style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'Your account, sessions, and all data will be permanently deleted.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete', style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      const { error } = await supabase.rpc('delete_user')
+                      if (error) throw error
+                      await supabase.auth.signOut()
+                      useStore.setState({ sessions: [], exercises: [], isLoggedIn: false, syncEnabled: false, isPro: false })
+                    } catch (e: any) {
+                      Alert.alert('Error', 'Could not delete account. Please contact support at support@repd.app')
+                    }
+                  },
+                },
+              ]
+            )
+          },
+        },
+      ]
+    )
+  }
+
   const confirmReset = () => {
     Alert.alert(
       'Reset All Data',
@@ -268,6 +303,8 @@ const handleWeeklySummary = async (val: boolean) => {
       {isLoggedIn && (
         <Section title="Account">
           <SettingRow label="Sign Out" onPress={handleSignOut} danger />
+          <View style={styles.divider} />
+          <SettingRow label="Delete Account" onPress={handleDeleteAccount} danger />
         </Section>
       )}
 
