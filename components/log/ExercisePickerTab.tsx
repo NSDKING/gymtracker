@@ -1,50 +1,127 @@
-import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
+import React, { useState, useMemo, useCallback, memo } from 'react'
+import {
+  View, Text, TextInput, TouchableOpacity,
+  FlatList, ScrollView, StyleSheet,
+  type ListRenderItemInfo,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import type { Exercise } from '../../store/index'
 import { useStore } from '../../store/index'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '../../constants/theme'
 
-type Props = {
-  exercises: Exercise[]
+type ListItem =
+  | { kind: 'header'; id: string; title: string }
+  | { kind: 'row'; id: string; exercise: Exercise; isFirst: boolean; isLast: boolean; accent: boolean }
+
+type Props = { exercises: Exercise[]; onPick: (ex: Exercise) => void }
+
+// Stable memoized row — only re-renders if its own props change
+const ExRow = memo(function ExRow({
+  exercise, onPick, isFirst, isLast, accent,
+}: {
+  exercise: Exercise
   onPick: (ex: Exercise) => void
-}
+  isFirst: boolean
+  isLast: boolean
+  accent: boolean
+}) {
+  const handlePress = useCallback(() => onPick(exercise), [onPick, exercise])
+  return (
+    <TouchableOpacity
+      style={[
+        styles.row,
+        isFirst && styles.rowFirst,
+        isLast && styles.rowLast,
+        !isLast && styles.rowBorder,
+      ]}
+      onPress={handlePress}
+      activeOpacity={0.7}
+    >
+      <View style={accent ? styles.dotActive : styles.dot} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.exName}>{exercise.name}</Text>
+        <Text style={styles.exMuscle}>{exercise.muscle}</Text>
+      </View>
+      <Ionicons name="add" size={16} color={accent ? ACCENT : MUTED} />
+    </TouchableOpacity>
+  )
+})
 
 export default function ExercisePickerTab({ exercises, onPick }: Props) {
   const { sessions } = useStore()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All')
 
-  const muscles = ['All', ...Array.from(new Set(exercises.map((e) => e.muscle)))]
+  const muscles = useMemo(
+    () => ['All', ...Array.from(new Set(exercises.map((e) => e.muscle)))],
+    [exercises]
+  )
 
-  // Recent = exercises used in last 5 sessions
-  const recentIds = Array.from(new Set(
-    sessions
-      .slice(-5)
-      .flatMap((s) => s.entries.map((e) => e.exercise.id))
-  ))
-  const recentExercises = recentIds
-    .map((id) => exercises.find((e) => e.id === id))
-    .filter(Boolean) as Exercise[]
+  const recentIds = useMemo(
+    () => Array.from(new Set(
+      sessions.slice(-5).flatMap((s) => s.entries.map((e) => e.exercise.id))
+    )),
+    [sessions]
+  )
 
-  const filtered = exercises.filter((ex) => {
-    const matchSearch = ex.name.toLowerCase().includes(search.toLowerCase())
-    const matchMuscle = filter === 'All' || ex.muscle === filter
-    return matchSearch && matchMuscle
-  })
+  const listData = useMemo((): ListItem[] => {
+    const items: ListItem[] = []
+    const searchLower = search.toLowerCase()
+    const showRecent = search === '' && filter === 'All'
 
-  // Group filtered by muscle
-  const grouped: Record<string, Exercise[]> = {}
-  filtered.forEach((ex) => {
-    if (!grouped[ex.muscle]) grouped[ex.muscle] = []
-    grouped[ex.muscle].push(ex)
-  })
+    if (showRecent) {
+      const recentExs = recentIds
+        .map((id) => exercises.find((e) => e.id === id))
+        .filter(Boolean) as Exercise[]
+      if (recentExs.length > 0) {
+        items.push({ kind: 'header', id: '__hdr_recent', title: 'Recent' })
+        recentExs.forEach((ex, i) => items.push({
+          kind: 'row', id: `recent_${ex.id}`, exercise: ex,
+          isFirst: i === 0, isLast: i === recentExs.length - 1, accent: true,
+        }))
+      }
+    }
 
-  const showRecent = search === '' && filter === 'All' && recentExercises.length > 0
+    const grouped: Record<string, Exercise[]> = {}
+    exercises.forEach((ex) => {
+      if (!ex.name.toLowerCase().includes(searchLower)) return
+      if (filter !== 'All' && ex.muscle !== filter) return
+      if (!grouped[ex.muscle]) grouped[ex.muscle] = []
+      grouped[ex.muscle].push(ex)
+    })
+
+    Object.entries(grouped).forEach(([muscle, exs]) => {
+      items.push({ kind: 'header', id: `__hdr_${muscle}`, title: muscle })
+      exs.forEach((ex, i) => items.push({
+        kind: 'row', id: ex.id, exercise: ex,
+        isFirst: i === 0, isLast: i === exs.length - 1, accent: false,
+      }))
+    })
+
+    return items
+  }, [exercises, search, filter, recentIds])
+
+  const clearSearch = useCallback(() => setSearch(''), [])
+
+  const renderItem = useCallback(({ item }: ListRenderItemInfo<ListItem>) => {
+    if (item.kind === 'header') {
+      return <Text style={styles.sectionLabel}>{item.title.toUpperCase()}</Text>
+    }
+    return (
+      <ExRow
+        exercise={item.exercise}
+        onPick={onPick}
+        isFirst={item.isFirst}
+        isLast={item.isLast}
+        accent={item.accent}
+      />
+    )
+  }, [onPick])
+
+  const keyExtractor = useCallback((item: ListItem) => item.id, [])
 
   return (
     <View style={{ flex: 1 }}>
-      {/* Search */}
       <View style={styles.searchWrap}>
         <Ionicons name="search-outline" size={16} color={DIM} style={{ marginRight: 8 }} />
         <TextInput
@@ -55,13 +132,12 @@ export default function ExercisePickerTab({ exercises, onPick }: Props) {
           onChangeText={setSearch}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
+          <TouchableOpacity onPress={clearSearch} activeOpacity={0.7}>
             <Ionicons name="close-circle" size={16} color={DIM} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Muscle filter */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -81,79 +157,19 @@ export default function ExercisePickerTab({ exercises, onPick }: Props) {
         ))}
       </ScrollView>
 
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-
-        {/* Recent section */}
-        {showRecent && (
-          <View>
-            <Text style={styles.sectionLabel}>RECENT</Text>
-            <View style={styles.groupCard}>
-              {recentExercises.map((ex, i) => (
-                <TouchableOpacity
-                  key={ex.id}
-                  style={[styles.row, i < recentExercises.length - 1 && styles.rowBorder]}
-                  onPress={() => onPick(ex)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.dotActive} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.exName}>{ex.name}</Text>
-                    <Text style={styles.exMuscle}>{ex.muscle}</Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => onPick(ex)}
-                    style={styles.addBtnActive}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add" size={18} color="#000" />
-                  </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Grouped sections */}
-        {Object.entries(grouped).map(([muscle, exs]) => (
-          <View key={muscle}>
-            <Text style={styles.sectionLabel}>{muscle.toUpperCase()}</Text>
-            <View style={styles.groupCard}>
-              {exs.map((ex, i) => {
-                const isRecent = recentIds.includes(ex.id)
-                return (
-                  <TouchableOpacity
-                    key={ex.id}
-                    style={[styles.row, i < exs.length - 1 && styles.rowBorder]}
-                    onPress={() => onPick(ex)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={isRecent ? styles.dotActive : styles.dot} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.exName}>{ex.name}</Text>
-                      <Text style={styles.exMuscle}>{ex.muscle}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => onPick(ex)}
-                      style={styles.addBtn}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="add" size={16} color={MUTED} />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
-          </View>
-        ))}
-
-        {filtered.length === 0 && (
+      <FlatList
+        data={listData}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>No exercises found</Text>
           </View>
-        )}
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+        }
+      />
     </View>
   )
 }
@@ -179,39 +195,27 @@ const styles = StyleSheet.create({
   filterChipText: { fontSize: 13, fontWeight: '500', color: MUTED },
   filterChipTextActive: { color: ACCENT },
 
+  listContent: { paddingHorizontal: 14, paddingBottom: 40 },
+
   sectionLabel: {
     fontSize: 10, fontWeight: '700', color: DIM,
-    textTransform: 'uppercase', letterSpacing: 1.2,
-    paddingHorizontal: 14, paddingBottom: 6, paddingTop: 4,
+    letterSpacing: 1.2, paddingBottom: 6, paddingTop: 10,
   },
-  groupCard: {
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    borderRadius: 13, marginHorizontal: 14, marginBottom: 10, overflow: 'hidden',
-  },
+
   row: {
     flexDirection: 'row', alignItems: 'center',
     padding: 14, gap: 12,
+    backgroundColor: CARD,
+    borderLeftWidth: 1, borderRightWidth: 1, borderColor: BORDER,
   },
+  rowFirst: { borderTopWidth: 1, borderTopLeftRadius: 13, borderTopRightRadius: 13 },
+  rowLast: { borderBottomWidth: 1, borderBottomLeftRadius: 13, borderBottomRightRadius: 13 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
-  dot: {
-    width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#333',
-  },
-  dotActive: {
-    width: 7, height: 7, borderRadius: 3.5, backgroundColor: ACCENT,
-  },
+
+  dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#333' },
+  dotActive: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: ACCENT },
   exName: { fontSize: 15, fontWeight: '600', color: '#fff' },
   exMuscle: { fontSize: 11, color: MUTED, marginTop: 2 },
-
-  addBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#222', borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  addBtnActive: {
-    width: 30, height: 30, borderRadius: 15,
-    backgroundColor: ACCENT,
-    alignItems: 'center', justifyContent: 'center',
-  },
 
   empty: { padding: 32, alignItems: 'center' },
   emptyText: { fontSize: 13, color: DIM },

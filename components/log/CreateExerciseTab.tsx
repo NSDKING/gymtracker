@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, memo } from 'react'
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, StyleSheet } from 'react-native'
 import { useStore } from '../../store/index'
 import type { Exercise } from '../../store/index'
@@ -6,20 +6,39 @@ import { ACCENT, CARD, BORDER, MUTED, DIM } from '../../constants/theme'
 
 const MUSCLES = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Other']
 
+const MuscleChip = memo(function MuscleChip({
+  label, selected, onSelect,
+}: { label: string; selected: boolean; onSelect: (m: string) => void }) {
+  const handlePress = useCallback(() => onSelect(label), [label, onSelect])
+  return (
+    <TouchableOpacity
+      onPress={handlePress}
+      activeOpacity={0.7}
+      style={[styles.chip, selected && styles.chipActive]}
+    >
+      {selected && <Text style={{ fontSize: 9, color: ACCENT, marginRight: 4 }}>✓</Text>}
+      <Text style={[styles.chipText, selected && styles.chipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  )
+})
+
 export default function CreateExerciseTab({ onCreated }: { onCreated: (ex: Exercise) => void }) {
   const { addExercise, exercises } = useStore()
   const [name, setName] = useState('')
   const [muscle, setMuscle] = useState('Chest')
 
-  const create = () => {
+  const handleSelectMuscle = useCallback((m: string) => setMuscle(m), [])
+
+  const create = useCallback(() => {
     const trimmed = name.trim()
     if (!trimmed) { Alert.alert('Missing name', 'Give your exercise a name.'); return }
     const exists = exercises.find((e) => e.name.toLowerCase() === trimmed.toLowerCase())
     if (exists) { Alert.alert('Already exists', 'An exercise with that name already exists.'); return }
-    const newEx: Exercise = { id: Date.now().toString(), name: trimmed, muscle }
-    addExercise(newEx)
+    const newEx = addExercise(trimmed, muscle)
     onCreated(newEx)
-  }
+  }, [name, muscle, exercises, addExercise, onCreated])
+
+  const trimmedName = name.trim()
 
   return (
     <ScrollView
@@ -41,22 +60,14 @@ export default function CreateExerciseTab({ onCreated }: { onCreated: (ex: Exerc
       <Text style={[styles.label, { marginTop: 20 }]}>Muscle Group</Text>
       <View style={styles.muscleGrid}>
         {MUSCLES.map((m) => (
-          <TouchableOpacity
-            key={m}
-            onPress={() => setMuscle(m)}
-            activeOpacity={0.7}
-            style={[styles.chip, muscle === m && styles.chipActive]}
-          >
-            {muscle === m && <Text style={{ fontSize: 9, color: ACCENT, marginRight: 4 }}>✓</Text>}
-            <Text style={[styles.chipText, muscle === m && styles.chipTextActive]}>{m}</Text>
-          </TouchableOpacity>
+          <MuscleChip key={m} label={m} selected={muscle === m} onSelect={handleSelectMuscle} />
         ))}
       </View>
 
-      <View style={[styles.preview, !name.trim() && { opacity: 0.3 }]}>
+      <View style={[styles.preview, !trimmedName && { opacity: 0.3 }]}>
         <View style={styles.previewDot} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.previewName}>{name.trim() || 'Exercise name'}</Text>
+          <Text style={styles.previewName}>{trimmedName || 'Exercise name'}</Text>
           <Text style={styles.previewMuscle}>{muscle}</Text>
         </View>
         <View style={styles.previewChip}>
@@ -67,10 +78,10 @@ export default function CreateExerciseTab({ onCreated }: { onCreated: (ex: Exerc
       <TouchableOpacity
         onPress={create}
         activeOpacity={0.85}
-        style={[styles.createBtn, !name.trim() && styles.createBtnDisabled]}
+        style={[styles.createBtn, !trimmedName && styles.createBtnDisabled]}
       >
         <Text style={styles.createBtnText}>
-          {name.trim() ? `Create "${name.trim()}" & Add` : 'Create & Add to Session'}
+          {trimmedName ? `Create "${trimmedName}" & Add` : 'Create & Add to Session'}
         </Text>
       </TouchableOpacity>
     </ScrollView>

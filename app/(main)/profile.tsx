@@ -176,7 +176,6 @@ const handleWeeklySummary = async (val: boolean) => {
       )}
 
       <Section title="Preferences">
-        // Update the toggle rows:
         <SettingRow
           label="Workout Reminders"
           toggle
@@ -199,6 +198,14 @@ const handleWeeklySummary = async (val: boolean) => {
             label={exporting ? 'Exporting...' : 'Export to CSV'}
             value="↓"
             onPress={exporting ? undefined : handleExport}
+          />
+        </ProGate>
+        <View style={styles.divider} />
+        <ProGate isPro={isPro}>
+          <SettingRow
+            label="AI Coach"
+            value="→"
+            onPress={() => router.push('/ai-recommend')}
           />
         </ProGate>
         <View style={styles.divider} />

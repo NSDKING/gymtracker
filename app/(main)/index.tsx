@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { router } from 'expo-router'
 import { useStore, getPRs, getStreak, getTotalVolume } from '../../store/index'
 import Heatmap from '../../components/Heatmap'
 import WeeklyBars from '../../components/dashboard/WeeklyBars'
@@ -59,6 +60,15 @@ export default function Dashboard() {
       />
       <WeeklyBars sessions={sessions} />
 
+      {/* AI Coach Card */}
+      <TouchableOpacity style={styles.aiCard} onPress={() => router.push('/ai-recommend')} activeOpacity={0.85}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiCardTitle}>🤖 AI Coach</Text>
+          <Text style={styles.aiCardSub}>Get a personalized recommendation based on your training history</Text>
+        </View>
+        <Text style={styles.aiCardArrow}>→</Text>
+      </TouchableOpacity>
+
       {/* Recent PRs */}
       <View style={styles.sectionRow}>
         <Text style={styles.sectionTitle}>Recent PRs</Text>
@@ -111,4 +121,13 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 6 },
   emptyText: { fontSize: 13, color: MUTED, textAlign: 'center', lineHeight: 18 },
+  aiCard: {
+    marginHorizontal: 14, marginBottom: 16,
+    backgroundColor: 'rgba(200,240,101,0.07)', borderWidth: 1,
+    borderColor: 'rgba(200,240,101,0.25)', borderRadius: 14,
+    padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12,
+  },
+  aiCardTitle: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 3 },
+  aiCardSub: { fontSize: 12, color: MUTED, lineHeight: 16 },
+  aiCardArrow: { fontSize: 20, fontWeight: '700', color: ACCENT },
 })

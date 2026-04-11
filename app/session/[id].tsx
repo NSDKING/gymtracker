@@ -1,10 +1,12 @@
- import React from 'react'
+import React, { useRef } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert
 } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import ViewShot from 'react-native-view-shot'
+import * as Sharing from 'expo-sharing'
 import { useStore, getTotalVolume, getPRs } from '../../store/index'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '../../constants/theme'
 
@@ -26,6 +28,7 @@ export default function SessionSummaryScreen() {
   const insets = useSafeAreaInsets()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { sessions, exercises } = useStore()
+  const shareRef = useRef<ViewShot>(null)
 
   const session = sessions.find((s) => s.id === id)
 
@@ -68,6 +71,15 @@ export default function SessionSummaryScreen() {
   const dateLabel = new Date(session.date).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   })
+
+  const handleShare = async () => {
+    try {
+      const uri = await shareRef.current!.capture!()
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: 'Share Workout' })
+    } catch (e: any) {
+      Alert.alert('Share failed', e.message)
+    }
+  }
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -182,8 +194,48 @@ export default function SessionSummaryScreen() {
           </>
         ) : null}
 
+        {/* Share Card (captured by ViewShot) */}
+        <ViewShot ref={shareRef} options={{ format: 'png', quality: 1 }} style={styles.shareCard}>
+          <View style={styles.shareHeader}>
+            <Image source={require('../../assets/images/icon.png')} style={styles.shareIcon} />
+            <Text style={styles.shareAppName}>Repd</Text>
+          </View>
+          <Text style={styles.shareDate}>{dateLabel}</Text>
+          <View style={styles.shareStats}>
+            <View style={styles.shareStat}>
+              <Text style={styles.shareStatVal}>{totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol}<Text style={styles.shareStatUnit}> kg</Text></Text>
+              <Text style={styles.shareStatLabel}>Volume</Text>
+            </View>
+            <View style={styles.shareStatDivider} />
+            <View style={styles.shareStat}>
+              <Text style={styles.shareStatVal}>{totalSets}</Text>
+              <Text style={styles.shareStatLabel}>Sets</Text>
+            </View>
+            <View style={styles.shareStatDivider} />
+            <View style={styles.shareStat}>
+              <Text style={styles.shareStatVal}>{session.entries.length}</Text>
+              <Text style={styles.shareStatLabel}>Exercises</Text>
+            </View>
+          </View>
+          {exerciseBreakdown.map((item, i) => (
+            <View key={i} style={[styles.shareExRow, i < exerciseBreakdown.length - 1 && { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' }]}>
+              <Text style={styles.shareExName}>{item.isPR ? '⚡ ' : ''}{item.ex?.name ?? 'Unknown'}</Text>
+              <Text style={styles.shareExMeta}>{item.sets} sets · {item.maxWeight} kg</Text>
+            </View>
+          ))}
+          {sessionPRs.size > 0 && (
+            <View style={styles.sharePRBadge}>
+              <Text style={styles.sharePRText}>⚡ {sessionPRs.size} new PR{sessionPRs.size > 1 ? 's' : ''}</Text>
+            </View>
+          )}
+        </ViewShot>
+
         {/* CTAs */}
         <View style={styles.ctas}>
+          <TouchableOpacity style={styles.ctaShare} onPress={handleShare} activeOpacity={0.85}>
+            <Ionicons name="share-outline" size={18} color="#000" />
+            <Text style={styles.ctaShareText}>Share Workout</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.ctaPrimary}
             onPress={() => router.replace('/(main)/')}
@@ -299,4 +351,36 @@ const styles = StyleSheet.create({
     borderRadius: 13, height: 50, alignItems: 'center', justifyContent: 'center',
   },
   ctaSecondaryText: { fontSize: 15, fontWeight: '500', color: '#fff' },
+  ctaShare: {
+    backgroundColor: ACCENT, borderRadius: 13, height: 50,
+    alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', gap: 8,
+  },
+  ctaShareText: { fontSize: 15, fontWeight: '700', color: '#000' },
+
+  shareCard: {
+    marginHorizontal: 14, marginBottom: 8,
+    backgroundColor: '#0a0a0a', borderWidth: 1, borderColor: BORDER,
+    borderRadius: 16, padding: 20, gap: 12,
+  },
+  shareHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  shareIcon: { width: 28, height: 28, borderRadius: 6 },
+  shareAppName: { fontSize: 16, fontWeight: '800', color: ACCENT, letterSpacing: -0.3 },
+  shareDate: { fontSize: 13, color: MUTED },
+  shareStats: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
+  shareStat: { flex: 1, alignItems: 'center' },
+  shareStatVal: { fontSize: 22, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  shareStatUnit: { fontSize: 12, fontWeight: '400', color: MUTED },
+  shareStatLabel: { fontSize: 10, color: MUTED, textTransform: 'uppercase', letterSpacing: 1, marginTop: 2 },
+  shareStatDivider: { width: 1, height: 32, backgroundColor: BORDER },
+  shareExRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
+  shareExName: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  shareExMeta: { fontSize: 12, color: MUTED },
+  sharePRBadge: {
+    alignSelf: 'flex-start', marginTop: 4,
+    backgroundColor: 'rgba(200,240,101,0.1)', borderWidth: 1,
+    borderColor: 'rgba(200,240,101,0.25)', borderRadius: 999,
+    paddingHorizontal: 12, paddingVertical: 5,
+  },
+  sharePRText: { fontSize: 12, fontWeight: '600', color: ACCENT },
 })

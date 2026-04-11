@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
-  TextInput, StyleSheet, Alert
+  TextInput, StyleSheet, Alert, Modal
 } from 'react-native'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -22,7 +22,7 @@ export default function LogScreen() {
   const [showPicker, setShowPicker] = useState(false)
   const [date] = useState(new Date().toISOString().slice(0, 10))
 
-  const addEntry = (ex: Exercise) => {
+  const addEntry = useCallback((ex: Exercise) => {
     if (entries.find((e) => e.exercise.id === ex.id)) {
       Alert.alert('Already added', `${ex.name} is already in this session.`)
       return
@@ -32,7 +32,7 @@ export default function LogScreen() {
       { exercise: ex, sets: [{ sets: '1', reps: '', weight: '' }] }
     ])
     setShowPicker(false)
-  }
+  }, [entries])
 
   const removeEntry = (i: number) =>
     setEntries((prev) => prev.filter((_, idx) => idx !== i))
@@ -147,7 +147,7 @@ export default function LogScreen() {
           activeOpacity={0.7}
         >
           <Ionicons name="add" size={16} color={MUTED} />
-          <Text style={styles.addExBtnText}>Add Exercise</Text>
+          <Text style={styles.addExBtnText}>add exercise</Text>
         </TouchableOpacity>
 
         <Text style={styles.fieldLabel}>Notes (optional)</Text>
@@ -176,21 +176,24 @@ export default function LogScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Picker overlay */}
-      {showPicker && (
-        <View style={StyleSheet.absoluteFill}>
-          <TouchableOpacity
-            style={styles.overlay}
-            activeOpacity={1}
-            onPress={() => setShowPicker(false)}
-          />
-          <ExercisePickerSheet
-            exercises={exercises}
-            onPick={addEntry}
-            onClose={() => setShowPicker(false)}
-          />
-        </View>
-      )}
+      {/* Picker — Modal isolates its render tree to avoid Hermes GC handle overflow */}
+      <Modal
+        visible={showPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPicker(false)}
+      >
+        <TouchableOpacity
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setShowPicker(false)}
+        />
+        <ExercisePickerSheet
+          exercises={exercises}
+          onPick={addEntry}
+          onClose={() => setShowPicker(false)}
+        />
+      </Modal>
     </View>
   )
 }

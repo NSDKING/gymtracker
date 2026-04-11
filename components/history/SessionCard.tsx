@@ -13,7 +13,7 @@ export default function SessionCard({ session, exercises }: Props) {
   const vol = getTotalVolume(session.entries)
   const sets = session.entries.reduce((t: number, e: any) => t + e.sets.length, 0)
   const exerciseNames = session.entries
-    .map((e: any) => exercises.find((x) => x.id === e.exerciseId)?.name)
+    .map((e: any) => e.exercise?.name ?? exercises.find((x) => x.id === e.exerciseId)?.name)
     .filter(Boolean)
 
   const isToday = session.date === new Date().toISOString().slice(0, 10)
