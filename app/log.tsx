@@ -81,7 +81,7 @@ export default function LogScreen() {
         ),
     }))
 
-    const sessionId = addSession({ date, entries: sessionEntries, note })
+    const { id: sessionId } = addSession({ date, entries: sessionEntries, note })
     router.replace(`/session/${sessionId}`)
   }
 

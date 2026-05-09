@@ -25,7 +25,8 @@ export default function RootLayout() {
 
         // 2. Initialize RevenueCat + sync in background (non-blocking)
         initRevenueCat()
-        checkProStatus().then(async (isPro) => {
+        checkProStatus().then(async (isPro) => { 
+          
           useStore.setState({ isPro })
           if (currentSession && isPro) {
             try {

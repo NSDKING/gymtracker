@@ -1,10 +1,10 @@
-import Purchases, { LOG_LEVEL, PurchasesPackage } from 'react-native-purchases'
+import Purchases, { LOG_LEVEL, PurchasesPackage, CustomerInfo } from 'react-native-purchases'
 import { useStore } from '../store'
 import { Platform } from 'react-native'
 
 const API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_KEY!
 const OFFERING_ID = 'pro'
-const ENTITLEMENT_ID = 'pro'
+const ENTITLEMENT_ID = 'repd Pro'
 
 export function initRevenueCat() {
   if (Platform.OS !== 'ios') return
@@ -12,10 +12,17 @@ export function initRevenueCat() {
   Purchases.configure({ apiKey: API_KEY_IOS })
 }
 
+/** True if the user has the entitlement OR any active Apple subscription */
+function isProFromInfo(info: CustomerInfo): boolean {
+  const hasEntitlement = typeof info.entitlements.active[ENTITLEMENT_ID] !== 'undefined'
+  const hasActiveSubscription = info.activeSubscriptions.length > 0
+  return hasEntitlement || hasActiveSubscription
+}
+
 export async function checkProStatus() {
   try {
     const info = await Purchases.getCustomerInfo()
-    const isPro = typeof info.entitlements.active[ENTITLEMENT_ID] !== 'undefined'
+    const isPro = isProFromInfo(info)
     useStore.getState().setIsPro(isPro)
     return isPro
   } catch (e) {
@@ -47,14 +54,14 @@ export async function getOffering() {
 
 export async function purchasePackage(pkg: PurchasesPackage) {
   const { customerInfo } = await Purchases.purchasePackage(pkg)
-  const isPro = typeof customerInfo.entitlements.active[ENTITLEMENT_ID] !== 'undefined'
+  const isPro = isProFromInfo(customerInfo)
   useStore.getState().setIsPro(isPro)
   return isPro
 }
 
 export async function restorePurchases() {
   const info = await Purchases.restorePurchases()
-  const isPro = typeof info.entitlements.active[ENTITLEMENT_ID] !== 'undefined'
+  const isPro = isProFromInfo(info)
   useStore.getState().setIsPro(isPro)
   return isPro
 }

@@ -1,7 +1,20 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
- 
+
+export type WorkoutPlan = {
+  planName: string
+  description: string
+  days: {
+    dayName: string
+    focus: string
+    exercises: { name: string; sets: number; reps: string; targetWeight: string; notes: string }[]
+  }[]
+}
+
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced'
+export type Equipment = 'full_gym' | 'home_gym' | 'bodyweight'
+
 export type Exercise = { id: string; name: string; muscle: string }
 export type SetEntry = { reps: number; weight: number }
 export type SessionEntry = { exercise: Exercise; sets: SetEntry[] }
@@ -12,13 +25,20 @@ type Store = {
   sessions: Session[]
   goal: string
   daysPerWeek: number
+  experienceLevel: ExperienceLevel
+  equipment: Equipment
+  focusMuscles: string[]
+  injuries: string
   isPro: boolean
   isLoggedIn: boolean
   syncEnabled: boolean
+  activeProgram: WorkoutPlan | null
+  pendingPlan: WorkoutPlan | null
+  pendingAdaptation: boolean
   addExercise: (name: string, muscle: string) => Exercise
   editExercise: (id: string, name: string, muscle: string) => void
   removeExercise: (id: string) => void
-  addSession: (session: Omit<Session, 'id'>) => string
+  addSession: (session: Omit<Session, 'id'>) => { id: string; newPRExerciseNames: string[] }
   removeSession: (id: string) => void
   editSessionSets: (sessionId: string, exerciseId: string, sets: SetEntry[]) => void
   setIsPro: (v: boolean) => void
@@ -26,6 +46,13 @@ type Store = {
   setSyncEnabled: (v: boolean) => void
   setGoal: (v: string) => void
   setDaysPerWeek: (v: number) => void
+  setExperienceLevel: (v: ExperienceLevel) => void
+  setEquipment: (v: Equipment) => void
+  setFocusMuscles: (v: string[]) => void
+  setInjuries: (v: string) => void
+  setActiveProgram: (plan: WorkoutPlan | null) => void
+  setPendingPlan: (plan: WorkoutPlan | null) => void
+  setPendingAdaptation: (v: boolean) => void
 }
 
 const uuid = () => Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -37,9 +64,16 @@ export const useStore = create<Store>()(
       sessions: [],
       goal: 'Build Muscle',
       daysPerWeek: 4,
+      experienceLevel: 'intermediate',
+      equipment: 'full_gym',
+      focusMuscles: [],
+      injuries: '',
       isPro: false,
       isLoggedIn: false,
       syncEnabled: false,
+      activeProgram: null,
+      pendingPlan: null,
+      pendingAdaptation: false,
 
       addExercise: (name, muscle) => {
         const ex: Exercise = { id: uuid(), name, muscle }
@@ -59,22 +93,26 @@ export const useStore = create<Store>()(
         const newSession: Session = { ...session, id }
         const newSessions = [...state.sessions, newSession]
 
-        // Check for new PRs
         const oldPRs = getPRs(state.sessions, state.exercises)
         const newPRs = getPRs(newSessions, state.exercises)
 
+        const newPRExerciseNames: string[] = []
         for (const [exerciseId, newPR] of Object.entries(newPRs)) {
           const oldPR = oldPRs[exerciseId]
           if (!oldPR || newPR.weight > oldPR.weight) {
             const exercise = state.exercises.find(e => e.id === exerciseId)
-            if (exercise && state.isPro) {
-            //sendPRNotification(exercise.name, newPR.weight)
-            }
+            if (exercise) newPRExerciseNames.push(exercise.name)
           }
         }
 
-        set({ sessions: newSessions })
-        return id
+        const shouldFlagAdaptation = newPRExerciseNames.length > 0 && state.activeProgram !== null
+
+        set({
+          sessions: newSessions,
+          ...(shouldFlagAdaptation ? { pendingAdaptation: true } : {}),
+        })
+
+        return { id, newPRExerciseNames }
       },
 
       removeSession: (id) =>
@@ -97,6 +135,13 @@ export const useStore = create<Store>()(
       setSyncEnabled: (v) => set({ syncEnabled: v }),
       setGoal: (v) => set({ goal: v }),
       setDaysPerWeek: (v) => set({ daysPerWeek: v }),
+      setExperienceLevel: (v) => set({ experienceLevel: v }),
+      setEquipment: (v) => set({ equipment: v }),
+      setFocusMuscles: (v) => set({ focusMuscles: v }),
+      setInjuries: (v) => set({ injuries: v }),
+      setActiveProgram: (plan) => set({ activeProgram: plan, pendingAdaptation: false }),
+      setPendingPlan: (plan) => set({ pendingPlan: plan }),
+      setPendingAdaptation: (v) => set({ pendingAdaptation: v }),
     }),
     {
       name: 'repd-storage',
@@ -138,7 +183,7 @@ export function getStreak(sessions: Session[]): number {
 
 export function getPRs(
   sessions: Session[],
-  exercises: Exercise[]
+  _exercises?: Exercise[]
 ): Record<string, { weight: number; date: string }> {
   const prs: Record<string, { weight: number; date: string }> = {}
   for (const session of sessions) {

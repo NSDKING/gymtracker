@@ -1,6 +1,6 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState } from 'react'
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, ActivityIndicator
 } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -8,6 +8,8 @@ import { Ionicons } from '@expo/vector-icons'
 import ViewShot from 'react-native-view-shot'
 import * as Sharing from 'expo-sharing'
 import { useStore, getTotalVolume, getPRs } from '../../store/index'
+import { getSessionFeedback } from '../../lib/ai'
+import type { SessionFeedback } from '../../lib/ai'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '../../constants/theme'
 
 function ProgressBar({ pct, highlight }: { pct: number; highlight?: boolean }) {
@@ -27,8 +29,10 @@ function ProgressBar({ pct, highlight }: { pct: number; highlight?: boolean }) {
 export default function SessionSummaryScreen() {
   const insets = useSafeAreaInsets()
   const { id } = useLocalSearchParams<{ id: string }>()
-  const { sessions, exercises } = useStore()
+  const { sessions, exercises, isPro, pendingAdaptation, goal } = useStore()
   const shareRef = useRef<ViewShot>(null)
+  const [feedback, setFeedback] = useState<SessionFeedback | null>(null)
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
 
   const session = sessions.find((s) => s.id === id)
 
@@ -81,6 +85,18 @@ export default function SessionSummaryScreen() {
     }
   }
 
+  const handleGetFeedback = async () => {
+    try {
+      setFeedbackLoading(true)
+      const result = await getSessionFeedback(id)
+      setFeedback(result)
+    } catch {
+      Alert.alert('Error', 'Could not get coach feedback. Try again.')
+    } finally {
+      setFeedbackLoading(false)
+    }
+  }
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <ScrollView
@@ -127,6 +143,72 @@ export default function SessionSummaryScreen() {
             </View>
           ))}
         </View>
+
+        {/* Coach Feedback */}
+        {isPro && (
+          <View style={{ marginHorizontal: 14, marginTop: 16 }}>
+            {feedback ? (
+              <View style={styles.feedbackCard}>
+                <View style={styles.feedbackHeader}>
+                  <Text style={styles.feedbackIcon}>🤖</Text>
+                  <Text style={styles.feedbackHeadline}>{feedback.headline}</Text>
+                </View>
+                <Text style={styles.feedbackNote}>{feedback.coachNote}</Text>
+                {feedback.nextTarget ? (
+                  <View style={styles.feedbackTarget}>
+                    <Text style={styles.feedbackTargetLabel}>NEXT TARGET</Text>
+                    <Text style={styles.feedbackTargetTxt}>{feedback.nextTarget}</Text>
+                  </View>
+                ) : null}
+                {feedback.newPRs.length > 0 && (
+                  <View style={styles.feedbackPRs}>
+                    {feedback.newPRs.map((pr, i) => (
+                      <View key={i} style={styles.feedbackPRBadge}>
+                        <Text style={styles.feedbackPRTxt}>⚡ {pr}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.feedbackBtn, feedbackLoading && { opacity: 0.6 }]}
+                onPress={handleGetFeedback}
+                disabled={feedbackLoading}
+                activeOpacity={0.85}
+              >
+                {feedbackLoading ? (
+                  <>
+                    <ActivityIndicator color={ACCENT} size="small" />
+                    <Text style={styles.feedbackBtnTxt}>Coach is reviewing…</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.feedbackBtnIcon}>🤖</Text>
+                    <Text style={styles.feedbackBtnTxt}>Get Coach Feedback</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* Adapt Program Banner */}
+        {isPro && pendingAdaptation && (
+          <TouchableOpacity
+            style={styles.adaptBanner}
+            onPress={() => router.push('/ai-workout')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.adaptBannerLeft}>
+              <Text style={styles.adaptBannerTitle}>New PR — update your program</Text>
+              <Text style={styles.adaptBannerSub}>
+                Regenerate your plan with your latest {goal} targets
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={ACCENT} />
+          </TouchableOpacity>
+        )}
 
         {/* Exercises */}
         <View style={styles.sectionHeader}>
@@ -298,6 +380,46 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   bigNumberUnit: { fontSize: 13, fontWeight: '400', color: MUTED },
+
+  feedbackBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: 13, paddingVertical: 14,
+  },
+  feedbackBtnIcon: { fontSize: 16 },
+  feedbackBtnTxt: { fontSize: 14, fontWeight: '600', color: '#fff' },
+
+  feedbackCard: {
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: 13, padding: 14, gap: 10,
+  },
+  feedbackHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  feedbackIcon: { fontSize: 16 },
+  feedbackHeadline: { fontSize: 15, fontWeight: '700', color: '#fff', flex: 1 },
+  feedbackNote: { fontSize: 13, color: MUTED, lineHeight: 20 },
+  feedbackTarget: {
+    backgroundColor: 'rgba(200,240,101,0.06)', borderWidth: 1,
+    borderColor: 'rgba(200,240,101,0.15)', borderRadius: 10, padding: 10, gap: 3,
+  },
+  feedbackTargetLabel: { fontSize: 9, fontWeight: '700', color: ACCENT, letterSpacing: 1.5, textTransform: 'uppercase' },
+  feedbackTargetTxt: { fontSize: 13, color: '#fff', fontWeight: '500' },
+  feedbackPRs: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  feedbackPRBadge: {
+    backgroundColor: 'rgba(200,240,101,0.08)', borderWidth: 1,
+    borderColor: 'rgba(200,240,101,0.22)', borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  feedbackPRTxt: { fontSize: 11, fontWeight: '600', color: ACCENT },
+
+  adaptBanner: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 14, marginTop: 10,
+    backgroundColor: 'rgba(200,240,101,0.07)', borderWidth: 1,
+    borderColor: 'rgba(200,240,101,0.2)', borderRadius: 13, padding: 14,
+  },
+  adaptBannerLeft: { flex: 1, gap: 2 },
+  adaptBannerTitle: { fontSize: 13, fontWeight: '700', color: ACCENT },
+  adaptBannerSub: { fontSize: 11, color: MUTED },
 
   sectionHeader: { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 8 },
   sectionTitle: { fontSize: 18, fontWeight: '700', color: '#fff', letterSpacing: -0.3 },

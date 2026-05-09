@@ -300,14 +300,12 @@ const handleWeeklySummary = async (val: boolean) => {
         <SettingRow label="Personal Records" value={`${prCount}`} />
       </Section>
 
-      {isLoggedIn && (
         <Section title="Account">
           <SettingRow label="Sign Out" onPress={handleSignOut} danger />
           <View style={styles.divider} />
           <SettingRow label="Delete Account" onPress={handleDeleteAccount} danger />
         </Section>
-      )}
-
+        
       <Section title="About">
         <SettingRow label="Version" value="1.0.0" />
         <View style={styles.divider} />
@@ -317,6 +315,15 @@ const handleWeeklySummary = async (val: boolean) => {
       <Section title="Danger Zone" danger>
         <SettingRow label="Reset All Data" onPress={confirmReset} danger />
       </Section>
+
+      {__DEV__ && (
+        <Section title="Dev Tools">
+          <SettingRow
+            label={`Force Pro: ${isPro ? 'ON' : 'OFF'}`}
+            onPress={() => useStore.setState({ isPro: !isPro })}
+          />
+        </Section>
+      )}
 
       <Text style={styles.footer}>Repd · Made with 💪</Text>
     </ScrollView>

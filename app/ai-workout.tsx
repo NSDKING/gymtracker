@@ -6,33 +6,26 @@ import {
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { generateAIWorkout } from '../lib/ai'
+import { useStore } from '../store'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '../constants/theme'
 
 const GOALS = ['Build muscle', 'Increase strength', 'Lose fat', 'Improve endurance', 'General fitness']
 const DAYS = [2, 3, 4, 5, 6]
 
-type WorkoutPlan = {
-  planName: string
-  description: string
-  days: {
-    dayName: string
-    focus: string
-    exercises: { name: string; sets: number; reps: string; notes: string }[]
-  }[]
-}
-
 export default function AIWorkoutScreen() {
   const insets = useSafeAreaInsets()
-  const [goal, setGoal] = useState(GOALS[0])
-  const [daysPerWeek, setDaysPerWeek] = useState(4)
+  const { goal: storeGoal, daysPerWeek: storeDays, setActiveProgram, activeProgram } = useStore()
+  const [goal, setGoal] = useState(storeGoal || GOALS[0])
+  const [daysPerWeek, setDaysPerWeek] = useState(storeDays || 4)
   const [loading, setLoading] = useState(false)
-  const [plan, setPlan] = useState<WorkoutPlan | null>(null)
+  const [plan, setPlan] = useState(activeProgram)
 
   const handleGenerate = async () => {
     try {
       setLoading(true)
       const result = await generateAIWorkout(goal, daysPerWeek)
       setPlan(result)
+      setActiveProgram(result)
     } catch (e: any) {
       Alert.alert('Error', 'Could not generate workout. Try again.')
     } finally {
@@ -94,7 +87,7 @@ export default function AIWorkoutScreen() {
         </TouchableOpacity>
 
         {loading && (
-          <Text style={styles.loadingHint}>Claude is building your plan…</Text>
+          <Text style={styles.loadingHint}>Claude is building your personalised plan…</Text>
         )}
 
         {/* Plan result */}
@@ -117,11 +110,18 @@ export default function AIWorkoutScreen() {
                     </View>
                     <View style={styles.exRight}>
                       <Text style={styles.exSets}>{ex.sets} × {ex.reps}</Text>
+                      {ex.targetWeight ? (
+                        <Text style={styles.exTarget}>{ex.targetWeight}</Text>
+                      ) : null}
                     </View>
                   </View>
                 ))}
               </View>
             ))}
+
+            <View style={styles.savedBadge}>
+              <Text style={styles.savedBadgeTxt}>✓ Saved as active program</Text>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -161,6 +161,14 @@ const styles = StyleSheet.create({
   exLeft: { flex: 1 },
   exName: { fontSize: 14, fontWeight: '500', color: '#fff' },
   exNotes: { fontSize: 11, color: DIM, marginTop: 2 },
-  exRight: {},
+  exRight: { alignItems: 'flex-end', gap: 2 },
   exSets: { fontSize: 13, fontWeight: '700', color: ACCENT },
+  exTarget: { fontSize: 11, color: MUTED, fontWeight: '500' },
+  savedBadge: {
+    alignSelf: 'center', marginTop: 4,
+    backgroundColor: 'rgba(200,240,101,0.08)', borderWidth: 1,
+    borderColor: 'rgba(200,240,101,0.2)', borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 6,
+  },
+  savedBadgeTxt: { fontSize: 12, color: ACCENT, fontWeight: '600' },
 })

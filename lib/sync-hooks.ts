@@ -3,7 +3,7 @@ import { supabase } from './supabase'
 
 // Call this instead of store.addSession when syncEnabled
 export async function syncAddSession(session: Omit<import('../store').Session, 'id'>) {
-  const id = useStore.getState().addSession(session)
+  const { id } = useStore.getState().addSession(session)
   if (!useStore.getState().syncEnabled) return id
 
   const { data: { user } } = await supabase.auth.getUser()

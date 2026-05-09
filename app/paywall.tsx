@@ -9,7 +9,9 @@ import { pushLocalToSupabase } from '@/lib/sync'
 
 export default function PaywallScreen() {
   const handlePurchaseCompleted = async ({ customerInfo }: { customerInfo: CustomerInfo }) => {
-    const isPro = typeof customerInfo.entitlements.active['pro'] !== 'undefined'
+    const hasEntitlement = typeof customerInfo.entitlements.active['repd Pro'] !== 'undefined'
+    const hasActiveSubscription = customerInfo.activeSubscriptions.length > 0
+    const isPro = hasEntitlement || hasActiveSubscription
     if (isPro) {
       useStore.getState().setIsPro(true)
       const { data: { user } } = await supabase.auth.getUser()
