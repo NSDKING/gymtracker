@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Alert
@@ -14,18 +14,23 @@ const DAYS = [2, 3, 4, 5, 6]
 
 export default function AIWorkoutScreen() {
   const insets = useSafeAreaInsets()
-  const { goal: storeGoal, daysPerWeek: storeDays, setActiveProgram, activeProgram } = useStore()
+  const { goal: storeGoal, daysPerWeek: storeDays, pendingPlan, setPendingPlan, activeProgram, isPro } = useStore()
+
+  useEffect(() => {
+    if (!isPro) router.replace('/paywall')
+  }, [isPro])
+
   const [goal, setGoal] = useState(storeGoal || GOALS[0])
   const [daysPerWeek, setDaysPerWeek] = useState(storeDays || 4)
   const [loading, setLoading] = useState(false)
-  const [plan, setPlan] = useState(activeProgram)
+  const [plan, setPlan] = useState(pendingPlan || activeProgram)
 
   const handleGenerate = async () => {
     try {
       setLoading(true)
       const result = await generateAIWorkout(goal, daysPerWeek)
       setPlan(result)
-      setActiveProgram(result)
+      setPendingPlan(result)
     } catch (e: any) {
       Alert.alert('Error', 'Could not generate workout. Try again.')
     } finally {
@@ -119,9 +124,9 @@ export default function AIWorkoutScreen() {
               </View>
             ))}
 
-            <View style={styles.savedBadge}>
-              <Text style={styles.savedBadgeTxt}>✓ Saved as active program</Text>
-            </View>
+            <TouchableOpacity style={styles.savedBadge} onPress={() => router.back()}>
+              <Text style={styles.savedBadgeTxt}>✓ Proposed — review on Dashboard →</Text>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>

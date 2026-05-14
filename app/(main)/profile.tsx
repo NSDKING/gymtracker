@@ -139,7 +139,7 @@ const handleWeeklySummary = async (val: boolean) => {
                   text: 'Yes, Delete', style: 'destructive',
                   onPress: async () => {
                     try {
-                      const { error } = await supabase.rpc('delete_user')
+                      const { error } = await supabase.functions.invoke('delete-user')
                       if (error) throw error
                       await supabase.auth.signOut()
                       useStore.setState({ sessions: [], exercises: [], isLoggedIn: false, syncEnabled: false, isPro: false })

@@ -30,11 +30,11 @@ export async function getAIRecommendation(photoBase64?: string): Promise<AIRecom
   return data as AIRecommendation
 }
 
-export async function generateAIWorkout(goal: string, daysPerWeek: number): Promise<WorkoutPlan> {
+export async function generateAIWorkout(goal: string, daysPerWeek: number, feedback?: string): Promise<WorkoutPlan> {
   const { sessions, exercises, experienceLevel, equipment, focusMuscles, injuries } = useStore.getState()
 
   const { data, error } = await supabase.functions.invoke('ai-workout', {
-    body: { sessions, exercises, goal, daysPerWeek, experienceLevel, equipment, focusMuscles, injuries }
+    body: { sessions, exercises, goal, daysPerWeek, experienceLevel, equipment, focusMuscles, injuries, feedback }
   })
 
   if (error) throw error

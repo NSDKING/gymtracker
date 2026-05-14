@@ -8,10 +8,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { getAIRecommendation } from '../lib/ai'
 import type { AIRecommendation } from '../lib/ai'
+import { useStore } from '../store'
 import { ACCENT, CARD, BORDER, MUTED } from '../constants/theme'
 
 export default function AIRecommendScreen() {
   const insets = useSafeAreaInsets()
+  const { isPro } = useStore()
+
+  useEffect(() => {
+    if (!isPro) router.replace('/paywall')
+  }, [isPro])
+
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<AIRecommendation | null>(null)
   const [photoUri, setPhotoUri] = useState<string | null>(null)

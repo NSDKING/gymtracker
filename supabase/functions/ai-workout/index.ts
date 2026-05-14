@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
-    const { sessions, exercises, goal, daysPerWeek, experienceLevel, equipment, focusMuscles, injuries } = await req.json()
+    const { sessions, exercises, goal, daysPerWeek, experienceLevel, equipment, focusMuscles, injuries, feedback } = await req.json()
 
     const client = new Anthropic()
 
@@ -83,7 +83,7 @@ Instructions:
 - Respect any injuries or limitations — avoid or substitute problematic movements
 - If a muscle has been heavily trained recently, reduce its volume this week
 - Only suggest exercises available with their equipment
-
+${feedback ? `\nUser feedback on previous plan (apply this): ${feedback}` : ''}
 Respond with JSON only, no markdown, in this exact format:
 {
   "planName": "short name for this plan",

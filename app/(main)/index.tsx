@@ -1,8 +1,9 @@
-import React from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import React, { useState } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Alert } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { useStore, getPRs, getStreak, getTotalVolume } from '../../store/index'
+import { generateAIWorkout } from '../../lib/ai'
 import Heatmap from '../../components/Heatmap'
 import WeeklyBars from '../../components/dashboard/WeeklyBars'
 import StatGrid from '../../components/dashboard/StatGrid'
@@ -13,7 +14,25 @@ import { ACCENT, CARD, BORDER, MUTED } from '@/constants/theme'
 
 export default function Dashboard() {
   const insets = useSafeAreaInsets()
-  const { sessions, exercises, isPro, pendingPlan, setActiveProgram, setPendingPlan, activeProgram } = useStore()
+  const { sessions, exercises, isPro, pendingPlan, setActiveProgram, setPendingPlan, activeProgram, goal, daysPerWeek } = useStore()
+  const [showSwap, setShowSwap] = useState(false)
+  const [swapFeedback, setSwapFeedback] = useState('')
+  const [swapLoading, setSwapLoading] = useState(false)
+
+  const handleSwap = async (feedback?: string) => {
+    if (!isPro) { router.push('/paywall'); return }
+    try {
+      setSwapLoading(true)
+      const result = await generateAIWorkout(goal, daysPerWeek, feedback)
+      setPendingPlan(result)
+      setShowSwap(false)
+      setSwapFeedback('')
+    } catch {
+      Alert.alert('Error', 'Could not generate a new plan. Try again.')
+    } finally {
+      setSwapLoading(false)
+    }
+  }
   const prs = getPRs(sessions, exercises)
   const streak = getStreak(sessions)
   const totalVol = sessions.reduce((t, s) => t + getTotalVolume(s.entries), 0)
@@ -53,23 +72,24 @@ export default function Dashboard() {
       <PillNav />
 
       {/* Pending AI plan card */}
-      {isPro && pendingPlan && (
+      {pendingPlan && (
         <View style={styles.pendingPlanCard}>
           <View style={styles.pendingPlanTop}>
-            <Text style={styles.pendingPlanBadge}>✨ YOUR PLAN IS READY</Text>
-            <TouchableOpacity onPress={() => setPendingPlan(null)}>
+            <Text style={styles.pendingPlanBadge}>✨ PROPOSED PLAN</Text>
+            <TouchableOpacity onPress={() => { setPendingPlan(null); setShowSwap(false) }}>
               <Text style={styles.pendingPlanDismiss}>✕</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.pendingPlanName}>{pendingPlan.planName}</Text>
           <Text style={styles.pendingPlanDesc}>{pendingPlan.description}</Text>
           <Text style={styles.pendingPlanMeta}>{pendingPlan.days.length}-day split</Text>
+
           <View style={styles.pendingPlanActions}>
             <TouchableOpacity
               style={styles.acceptBtn}
-              onPress={() => { setActiveProgram(pendingPlan); setPendingPlan(null) }}
+              onPress={() => { setActiveProgram(pendingPlan); setPendingPlan(null); setShowSwap(false) }}
             >
-              <Text style={styles.acceptBtnTxt}>Accept Plan</Text>
+              <Text style={styles.acceptBtnTxt}>Validate ✓</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.editBtn}
@@ -77,7 +97,49 @@ export default function Dashboard() {
             >
               <Text style={styles.editBtnTxt}>Edit →</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.swapToggleBtn, showSwap && styles.swapToggleBtnActive]}
+              onPress={() => setShowSwap(v => !v)}
+            >
+              <Text style={[styles.swapToggleTxt, showSwap && styles.swapToggleTxtActive]}>↻</Text>
+            </TouchableOpacity>
           </View>
+
+          {showSwap && (
+            <View style={styles.swapSection}>
+              <TextInput
+                style={styles.swapInput}
+                placeholder="Tell the AI what to change… (optional)"
+                placeholderTextColor={MUTED}
+                value={swapFeedback}
+                onChangeText={setSwapFeedback}
+                multiline
+                editable={!swapLoading}
+              />
+              <View style={styles.swapActions}>
+                <TouchableOpacity
+                  style={[styles.swapBtn, swapLoading && { opacity: 0.5 }]}
+                  onPress={() => handleSwap()}
+                  disabled={swapLoading}
+                >
+                  {swapLoading && !swapFeedback.trim()
+                    ? <ActivityIndicator size="small" color={MUTED} />
+                    : <Text style={styles.swapBtnTxt}>🎲 Try another</Text>
+                  }
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.swapApplyBtn, (!swapFeedback.trim() || swapLoading) && { opacity: 0.4 }]}
+                  onPress={() => handleSwap(swapFeedback.trim())}
+                  disabled={!swapFeedback.trim() || swapLoading}
+                >
+                  {swapLoading && swapFeedback.trim()
+                    ? <ActivityIndicator size="small" color="#000" />
+                    : <Text style={styles.swapApplyTxt}>Apply →</Text>
+                  }
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       )}
 
@@ -248,4 +310,31 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   editBtnTxt: { fontSize: 14, fontWeight: '600', color: ACCENT },
+  swapToggleBtn: {
+    width: 42, height: 42, borderRadius: 10,
+    borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  swapToggleBtnActive: { backgroundColor: 'rgba(200,240,101,0.1)', borderColor: 'rgba(200,240,101,0.4)' },
+  swapToggleTxt: { fontSize: 18, color: MUTED },
+  swapToggleTxtActive: { color: ACCENT },
+  swapSection: { marginTop: 10, gap: 8 },
+  swapInput: {
+    backgroundColor: '#111', borderWidth: 1, borderColor: BORDER,
+    borderRadius: 10, padding: 12, color: '#fff', fontSize: 14,
+    minHeight: 60, textAlignVertical: 'top',
+  },
+  swapActions: { flexDirection: 'row', gap: 8 },
+  swapBtn: {
+    flex: 1, height: 40, borderRadius: 9,
+    borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  swapBtnTxt: { fontSize: 13, fontWeight: '600', color: MUTED },
+  swapApplyBtn: {
+    flex: 1, height: 40, borderRadius: 9,
+    backgroundColor: ACCENT,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  swapApplyTxt: { fontSize: 13, fontWeight: '700', color: '#000' },
 })
