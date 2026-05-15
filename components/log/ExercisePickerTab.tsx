@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, memo } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  FlatList, ScrollView, StyleSheet,
+  FlatList, ScrollView, StyleSheet, Alert, Modal,
   type ListRenderItemInfo,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -9,23 +9,24 @@ import type { Exercise } from '../../store/index'
 import { useStore } from '../../store/index'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '../../constants/theme'
 
+const MUSCLES = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Cardio', 'Other']
+
 type ListItem =
   | { kind: 'header'; id: string; title: string }
   | { kind: 'row'; id: string; exercise: Exercise; isFirst: boolean; isLast: boolean; accent: boolean }
 
 type Props = { exercises: Exercise[]; onPick: (ex: Exercise) => void }
 
-// Stable memoized row — only re-renders if its own props change
 const ExRow = memo(function ExRow({
-  exercise, onPick, isFirst, isLast, accent,
+  exercise, onPick, onLongPress, isFirst, isLast, accent,
 }: {
   exercise: Exercise
   onPick: (ex: Exercise) => void
+  onLongPress: (ex: Exercise) => void
   isFirst: boolean
   isLast: boolean
   accent: boolean
 }) {
-  const handlePress = useCallback(() => onPick(exercise), [onPick, exercise])
   return (
     <TouchableOpacity
       style={[
@@ -34,7 +35,9 @@ const ExRow = memo(function ExRow({
         isLast && styles.rowLast,
         !isLast && styles.rowBorder,
       ]}
-      onPress={handlePress}
+      onPress={() => onPick(exercise)}
+      onLongPress={() => onLongPress(exercise)}
+      delayLongPress={400}
       activeOpacity={0.7}
     >
       <View style={accent ? styles.dotActive : styles.dot} />
@@ -48,9 +51,39 @@ const ExRow = memo(function ExRow({
 })
 
 export default function ExercisePickerTab({ exercises, onPick }: Props) {
-  const { sessions } = useStore()
+  const { sessions, editExercise, removeExercise } = useStore()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('All')
+  const [editingEx, setEditingEx] = useState<Exercise | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editMuscle, setEditMuscle] = useState('')
+
+  const handleLongPress = useCallback((ex: Exercise) => {
+    Alert.alert(ex.name, undefined, [
+      {
+        text: 'Edit',
+        onPress: () => { setEditName(ex.name); setEditMuscle(ex.muscle); setEditingEx(ex) },
+      },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: () => Alert.alert(
+          'Delete Exercise',
+          `Delete "${ex.name}"? This won't remove it from past sessions.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => removeExercise(ex.id) },
+          ]
+        ),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }, [removeExercise])
+
+  const saveEdit = useCallback(() => {
+    if (!editingEx || !editName.trim()) return
+    editExercise(editingEx.id, editName.trim(), editMuscle)
+    setEditingEx(null)
+  }, [editingEx, editName, editMuscle, editExercise])
 
   const muscles = useMemo(
     () => ['All', ...Array.from(new Set(exercises.map((e) => e.muscle)))],
@@ -111,17 +144,66 @@ export default function ExercisePickerTab({ exercises, onPick }: Props) {
       <ExRow
         exercise={item.exercise}
         onPick={onPick}
+        onLongPress={handleLongPress}
         isFirst={item.isFirst}
         isLast={item.isLast}
         accent={item.accent}
       />
     )
-  }, [onPick])
+  }, [onPick, handleLongPress])
 
   const keyExtractor = useCallback((item: ListItem) => item.id, [])
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Edit modal */}
+      <Modal visible={!!editingEx} transparent animationType="fade">
+        <View style={styles.editOverlay}>
+          <View style={styles.editCard}>
+            <Text style={styles.editTitle}>Edit Exercise</Text>
+
+            <Text style={styles.editLabel}>Name</Text>
+            <TextInput
+              style={styles.editInput}
+              value={editName}
+              onChangeText={setEditName}
+              autoCorrect={false}
+              autoFocus
+            />
+
+            <Text style={[styles.editLabel, { marginTop: 14 }]}>Muscle Group</Text>
+            <View style={styles.muscleGrid}>
+              {MUSCLES.map(m => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.muscleChip, editMuscle === m && styles.muscleChipActive]}
+                  onPress={() => setEditMuscle(m)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.muscleChipTxt, editMuscle === m && styles.muscleChipTxtActive]}>
+                    {m}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.editBtns}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingEx(null)} activeOpacity={0.7}>
+                <Text style={styles.cancelTxt}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveBtn, !editName.trim() && { opacity: 0.4 }]}
+                onPress={saveEdit}
+                disabled={!editName.trim()}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.saveTxt}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <View style={styles.searchWrap}>
         <Ionicons name="search-outline" size={16} color={DIM} style={{ marginRight: 8 }} />
         <TextInput
@@ -219,4 +301,40 @@ const styles = StyleSheet.create({
 
   empty: { padding: 32, alignItems: 'center' },
   emptyText: { fontSize: 13, color: DIM },
+
+  editOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  editCard: {
+    backgroundColor: '#1a1a1a', borderWidth: 1, borderColor: BORDER,
+    borderRadius: 16, padding: 20, width: '88%',
+  },
+  editTitle: { fontSize: 17, fontWeight: '700', color: '#fff', marginBottom: 16 },
+  editLabel: { fontSize: 11, fontWeight: '600', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 7 },
+  editInput: {
+    backgroundColor: '#111', borderWidth: 1, borderColor: BORDER,
+    borderRadius: 10, height: 44, paddingHorizontal: 12,
+    fontSize: 15, color: '#fff',
+  },
+  muscleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 20 },
+  muscleChip: {
+    paddingVertical: 7, paddingHorizontal: 13,
+    borderRadius: 999, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD,
+  },
+  muscleChipActive: { backgroundColor: 'rgba(200,240,101,0.1)', borderColor: 'rgba(200,240,101,0.3)' },
+  muscleChipTxt: { fontSize: 12, fontWeight: '500', color: MUTED },
+  muscleChipTxtActive: { color: ACCENT },
+  editBtns: { flexDirection: 'row', gap: 10 },
+  cancelBtn: {
+    flex: 1, height: 44, borderRadius: 10,
+    borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  cancelTxt: { fontSize: 14, color: MUTED },
+  saveBtn: {
+    flex: 1, height: 44, borderRadius: 10,
+    backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center',
+  },
+  saveTxt: { fontSize: 14, fontWeight: '700', color: '#000' },
 })

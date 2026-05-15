@@ -4,7 +4,7 @@ export default {
   expo: {
     name: IS_DEV ? 'Repd (Dev)' : 'Repd',
     slug: 'repd',
-    version: '1.4.0',
+    version: '1.5.0',
     orientation: 'portrait',
     scheme: IS_DEV ? 'gymtracker' : 'repd',
     icon: './assets/images/iconV1.png',

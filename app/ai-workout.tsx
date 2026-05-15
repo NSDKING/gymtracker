@@ -32,7 +32,7 @@ export default function AIWorkoutScreen() {
       setPlan(result)
       setPendingPlan(result)
     } catch (e: any) {
-      Alert.alert('Error', 'Could not generate workout. Try again.')
+      Alert.alert('Error', e?.message ?? 'Could not generate workout. Try again.')
     } finally {
       setLoading(false)
     }

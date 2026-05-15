@@ -12,6 +12,29 @@ export type AIRecommendation = {
   emphasis: string[]
 }
 
+export type SwapSuggestion = {
+  name: string
+  sets: number
+  reps: string
+  targetWeight: string
+  notes: string
+}
+
+export async function swapExercise(
+  exerciseName: string,
+  dayFocus: string,
+  userRequest?: string
+): Promise<SwapSuggestion> {
+  const { equipment, injuries } = useStore.getState()
+
+  const { data, error } = await supabase.functions.invoke('ai-swap-exercise', {
+    body: { exerciseName, dayFocus, equipment, injuries, userRequest },
+  })
+
+  if (error) throw error
+  return data as SwapSuggestion
+}
+
 export type SessionFeedback = {
   headline: string
   coachNote: string

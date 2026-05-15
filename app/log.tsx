@@ -1,13 +1,14 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
   TextInput, StyleSheet, Alert, Modal
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useStore } from '@/store/index'
 import type { SessionEntry, Exercise } from '@/store/index'
+import { syncAddSession } from '@/lib/sync-hooks'
 import EntryCard from '@/components/log/EntryCard'
 import type { DraftSet, DraftEntry } from '@/components/log/EntryCard'
 import ExercisePickerSheet from '@/components/log/ExercisePickerSheet'
@@ -15,9 +16,30 @@ import { ACCENT, CARD, BORDER, MUTED, DIM } from '@/constants/theme'
 
 export default function LogScreen() {
   const insets = useSafeAreaInsets()
-  const { exercises, addSession } = useStore()
+  const { exercises, addExercise, activeProgram } = useStore()
+  const { prefillDay } = useLocalSearchParams<{ prefillDay?: string }>()
 
   const [entries, setEntries] = useState<DraftEntry[]>([])
+
+  useEffect(() => {
+    if (prefillDay === undefined || !activeProgram) return
+    const dayIdx = parseInt(prefillDay)
+    const day = activeProgram.days[dayIdx]
+    if (!day) return
+
+    const prefilled: DraftEntry[] = day.exercises.map(planEx => {
+      let ex: Exercise = exercises.find(
+        e => e.name.toLowerCase() === planEx.name.toLowerCase()
+      ) ?? addExercise(planEx.name, 'other')
+
+      const reps = planEx.reps.split('-')[0].trim()
+      const weight = planEx.targetWeight ? planEx.targetWeight.replace(/[^0-9.]/g, '') : ''
+
+      return { exercise: ex, sets: [{ sets: String(planEx.sets), reps, weight }] }
+    })
+
+    setEntries(prefilled)
+  }, [])
   const [note, setNote] = useState('')
   const [showPicker, setShowPicker] = useState(false)
   const [date] = useState(new Date().toISOString().slice(0, 10))
@@ -64,7 +86,7 @@ export default function LogScreen() {
       )
     )
 
-  const save = () => {
+  const save = async () => {
     if (entries.length === 0) {
       Alert.alert('No exercises', 'Add at least one exercise before saving.')
       return
@@ -81,7 +103,7 @@ export default function LogScreen() {
         ),
     }))
 
-    const { id: sessionId } = addSession({ date, entries: sessionEntries, note })
+    const sessionId = await syncAddSession({ date, entries: sessionEntries, note })
     router.replace(`/session/${sessionId}`)
   }
 
