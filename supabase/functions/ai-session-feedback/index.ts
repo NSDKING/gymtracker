@@ -82,7 +82,7 @@ Respond with JSON only, no markdown:
 }`
 
     const message = await client.messages.create({
-      model: 'claude-opus-4-5',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
       system: 'You are a precision strength coach. Always respond with valid JSON only.',
       messages: [{ role: 'user', content: prompt }],
