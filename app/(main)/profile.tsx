@@ -11,6 +11,7 @@ import { useStore, getTotalVolume, getStreak, getPRs } from '@/store/index'
 import { BORDER, DIM, ACCENT } from '@/constants/theme'
 import { supabase } from '@/lib/supabase'
 import { exportToCSV } from '@/lib/export'
+import { syncWithSupabase } from '@/lib/sync'
 
 import {
   requestNotificationPermissions,
@@ -56,6 +57,7 @@ export default function ProfileScreen() {
   const [prAlerts, setPrAlerts] = useState(true)
   const [weeklySummary, setWeeklySummary] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   const totalVol = sessions.reduce((t, s) => t + getTotalVolume(s.entries), 0)
   const streak = getStreak(sessions)
@@ -94,6 +96,19 @@ const handleWeeklySummary = async (val: boolean) => {
   const memberSince = firstSession
     ? new Date(firstSession.date).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
     : 'No sessions yet'
+
+  const handleSync = async () => {
+    if (!isPro) { router.push('/paywall'); return }
+    try {
+      setSyncing(true)
+      await syncWithSupabase()
+      Alert.alert('Synced', 'All data is up to date.')
+    } catch (e: any) {
+      Alert.alert('Sync failed', e.message)
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const handleExport = async () => {
     if (!isPro) { router.push('/paywall'); return }
@@ -254,8 +269,9 @@ const handleWeeklySummary = async (val: boolean) => {
         <View style={styles.divider} />
         <ProGate isPro={isPro}>
           <SettingRow
-            label="Cloud Sync"
-            value={isPro ? 'On' : 'Off'}
+            label={syncing ? 'Syncing…' : 'Cloud Sync'}
+            value={syncing ? '' : 'Sync Now'}
+            onPress={syncing ? undefined : handleSync}
           />
         </ProGate>
       </Section>
