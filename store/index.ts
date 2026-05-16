@@ -29,6 +29,11 @@ type Store = {
   equipment: Equipment
   focusMuscles: string[]
   injuries: string
+  bodyWeight: number | null
+  bodyHeight: number | null
+  targetBodyWeight: number | null
+  weightUnit: 'kg' | 'lbs'
+  heightUnit: 'cm' | 'ft'
   isPro: boolean
   isLoggedIn: boolean
   syncEnabled: boolean
@@ -41,6 +46,7 @@ type Store = {
   addSession: (session: Omit<Session, 'id'>) => { id: string; newPRExerciseNames: string[] }
   removeSession: (id: string) => void
   editSessionSets: (sessionId: string, exerciseId: string, sets: SetEntry[]) => void
+  setBodyStats: (weight: number | null, height: number | null, targetWeight: number | null, weightUnit: 'kg' | 'lbs', heightUnit: 'cm' | 'ft') => void
   setIsPro: (v: boolean) => void
   setIsLoggedIn: (v: boolean) => void
   setSyncEnabled: (v: boolean) => void
@@ -68,6 +74,11 @@ export const useStore = create<Store>()(
       equipment: 'full_gym',
       focusMuscles: [],
       injuries: '',
+      bodyWeight: null,
+      bodyHeight: null,
+      targetBodyWeight: null,
+      weightUnit: 'kg',
+      heightUnit: 'cm',
       isPro: false,
       isLoggedIn: false,
       syncEnabled: false,
@@ -130,6 +141,8 @@ export const useStore = create<Store>()(
           )
         })),
 
+      setBodyStats: (weight, height, targetWeight, weightUnit, heightUnit) =>
+        set({ bodyWeight: weight, bodyHeight: height, targetBodyWeight: targetWeight, weightUnit, heightUnit }),
       setIsPro: (v) => set({ isPro: v }),
       setIsLoggedIn: (v) => set({ isLoggedIn: v }),
       setSyncEnabled: (v) => set({ syncEnabled: v }),

@@ -306,7 +306,131 @@ function StepMuscles({
   )
 }
 
-// ─── STEP 5 — APPLE SIGN IN ───────────────────────────────────────────────────
+// ─── STEP 5 — BODY STATS ─────────────────────────────────────────────────────
+
+function StepBodyStats({
+  goal,
+  weightUnit, setWeightUnit,
+  heightUnit, setHeightUnit,
+  bodyWeight, setBodyWeight,
+  bodyHeight, setBodyHeight,
+  targetBodyWeight, setTargetBodyWeight,
+  onNext, onBack,
+}: {
+  goal: string
+  weightUnit: 'kg' | 'lbs'; setWeightUnit: (v: 'kg' | 'lbs') => void
+  heightUnit: 'cm' | 'ft'; setHeightUnit: (v: 'cm' | 'ft') => void
+  bodyWeight: string; setBodyWeight: (v: string) => void
+  bodyHeight: string; setBodyHeight: (v: string) => void
+  targetBodyWeight: string; setTargetBodyWeight: (v: string) => void
+  onNext: () => void; onBack: () => void
+}) {
+  const showTarget = ['Lose Fat', 'Build Muscle', 'Increase Strength'].includes(goal)
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>Body stats</Text>
+        <Text style={styles.stepSub}>
+          Helps the AI set smarter targets. All optional — you can fill these in later.
+        </Text>
+
+        {/* Weight */}
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Current weight</Text>
+          <View style={styles.statInputWrap}>
+            <TextInput
+              style={styles.statInput}
+              value={bodyWeight}
+              onChangeText={setBodyWeight}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor={DIM}
+            />
+            <View style={styles.unitToggle}>
+              {(['kg', 'lbs'] as const).map(u => (
+                <TouchableOpacity
+                  key={u}
+                  style={[styles.unitBtn, weightUnit === u && styles.unitBtnActive]}
+                  onPress={() => setWeightUnit(u)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.unitTxt, weightUnit === u && styles.unitTxtActive]}>{u}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Height */}
+        <View style={styles.statRow}>
+          <Text style={styles.statLabel}>Height</Text>
+          <View style={styles.statInputWrap}>
+            <TextInput
+              style={styles.statInput}
+              value={bodyHeight}
+              onChangeText={setBodyHeight}
+              keyboardType="decimal-pad"
+              placeholder={heightUnit === 'cm' ? '175' : '5\'10"'}
+              placeholderTextColor={DIM}
+            />
+            <View style={styles.unitToggle}>
+              {(['cm', 'ft'] as const).map(u => (
+                <TouchableOpacity
+                  key={u}
+                  style={[styles.unitBtn, heightUnit === u && styles.unitBtnActive]}
+                  onPress={() => setHeightUnit(u)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.unitTxt, heightUnit === u && styles.unitTxtActive]}>{u}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Target weight — shown for weight-relevant goals */}
+        {showTarget && (
+          <View style={styles.statRow}>
+            <Text style={styles.statLabel}>
+              Target weight
+              <Text style={{ color: DIM, fontSize: 12 }}> ({weightUnit})</Text>
+            </Text>
+            <View style={styles.statInputWrap}>
+              <TextInput
+                style={[styles.statInput, { flex: 1 }]}
+                value={targetBodyWeight}
+                onChangeText={setTargetBodyWeight}
+                keyboardType="decimal-pad"
+                placeholder="e.g. 80"
+                placeholderTextColor={DIM}
+              />
+              <View style={[styles.unitToggle, { backgroundColor: 'transparent', borderWidth: 0 }]}>
+                <Text style={{ color: MUTED, fontSize: 13, paddingHorizontal: 10 }}>{weightUnit}</Text>
+              </View>
+            </View>
+            <Text style={styles.statHint}>
+              {goal === 'Lose Fat'
+                ? 'The AI will calibrate volume to support a cut'
+                : 'The AI will set progressive targets toward this goal'}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.stepFooter}>
+        <TouchableOpacity style={styles.btnPrimary} onPress={onNext} activeOpacity={0.85}>
+          <Text style={styles.btnPrimaryText}>Continue →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onBack} activeOpacity={0.7}>
+          <Text style={styles.btnGhost}>Back</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  )
+}
+
+// ─── STEP 6 — APPLE SIGN IN ───────────────────────────────────────────────────
 
 function StepAuth({ onFinish }: { onFinish: () => void }) {
   const [error, setError] = useState<string | null>(null)
@@ -370,7 +494,7 @@ function StepAuth({ onFinish }: { onFinish: () => void }) {
 
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 6
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets()
@@ -383,6 +507,11 @@ export default function OnboardingScreen() {
   const [equipment, setEquipment] = useState<Equipment>('full_gym')
   const [focusMuscles, setFocusMuscles] = useState<string[]>(['Chest', 'Back', 'Legs'])
   const [injuries, setInjuries] = useState('')
+  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg')
+  const [heightUnit, setHeightUnit] = useState<'cm' | 'ft'>('cm')
+  const [bodyWeight, setBodyWeight] = useState('')
+  const [bodyHeight, setBodyHeight] = useState('')
+  const [targetBodyWeight, setTargetBodyWeight] = useState('')
 
   const finish = async () => {
     store.setExperienceLevel(experienceLevel)
@@ -391,6 +520,13 @@ export default function OnboardingScreen() {
     store.setEquipment(equipment)
     store.setFocusMuscles(focusMuscles)
     store.setInjuries(injuries)
+    store.setBodyStats(
+      bodyWeight ? parseFloat(bodyWeight) : null,
+      bodyHeight ? parseFloat(bodyHeight) : null,
+      targetBodyWeight ? parseFloat(targetBodyWeight) : null,
+      weightUnit,
+      heightUnit,
+    )
 
     await AsyncStorage.setItem('onboardingComplete', 'true')
     router.replace('/(main)/')
@@ -455,7 +591,19 @@ export default function OnboardingScreen() {
           onBack={() => setStep(3)}
         />
       )}
-      {step === 5 && <StepAuth onFinish={finish} />}
+      {step === 5 && (
+        <StepBodyStats
+          goal={goal}
+          weightUnit={weightUnit} setWeightUnit={setWeightUnit}
+          heightUnit={heightUnit} setHeightUnit={setHeightUnit}
+          bodyWeight={bodyWeight} setBodyWeight={setBodyWeight}
+          bodyHeight={bodyHeight} setBodyHeight={setBodyHeight}
+          targetBodyWeight={targetBodyWeight} setTargetBodyWeight={setTargetBodyWeight}
+          onNext={() => setStep(6)}
+          onBack={() => setStep(4)}
+        />
+      )}
+      {step === 6 && <StepAuth onFinish={finish} />}
     </View>
   )
 }
@@ -560,6 +708,23 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 14, color: '#fff', fontSize: 14,
     lineHeight: 20, textAlignVertical: 'top', minHeight: 80,
   },
+
+  statRow: { marginBottom: 20 },
+  statLabel: { fontSize: 13, fontWeight: '600', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  statInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  statInput: {
+    flex: 1, height: 48, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: 12, paddingHorizontal: 14, fontSize: 16, fontWeight: '600', color: '#fff',
+  },
+  unitToggle: {
+    flexDirection: 'row', backgroundColor: CARD,
+    borderWidth: 1, borderColor: BORDER, borderRadius: 10, overflow: 'hidden',
+  },
+  unitBtn: { paddingHorizontal: 12, paddingVertical: 13 },
+  unitBtnActive: { backgroundColor: 'rgba(200,240,101,0.15)' },
+  unitTxt: { fontSize: 13, fontWeight: '600', color: MUTED },
+  unitTxtActive: { color: ACCENT },
+  statHint: { fontSize: 12, color: DIM, marginTop: 6, lineHeight: 17 },
 
   btnPrimary: {
     backgroundColor: ACCENT, borderRadius: 13, height: 52,
