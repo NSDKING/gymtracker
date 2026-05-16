@@ -31,7 +31,10 @@ export async function swapExercise(
     body: { exerciseName, dayFocus, equipment, injuries, userRequest },
   })
 
-  if (error) throw error
+  if (error) {
+    const body = await (error as any).context?.json?.().catch(() => null)
+    throw new Error(body?.error ?? error.message)
+  }
   return data as SwapSuggestion
 }
 
@@ -49,7 +52,10 @@ export async function getAIRecommendation(photoBase64?: string): Promise<AIRecom
     body: { sessions, exercises, photoBase64, goal, daysPerWeek, experienceLevel, equipment, focusMuscles, injuries }
   })
 
-  if (error) throw error
+  if (error) {
+    const body = await (error as any).context?.json?.().catch(() => null)
+    throw new Error(body?.error ?? error.message)
+  }
   return data as AIRecommendation
 }
 
@@ -60,7 +66,10 @@ export async function generateAIWorkout(goal: string, daysPerWeek: number, feedb
     body: { sessions, exercises, goal, daysPerWeek, experienceLevel, equipment, focusMuscles, injuries, feedback }
   })
 
-  if (error) throw error
+  if (error) {
+    const body = await (error as any).context?.json?.().catch(() => null)
+    throw new Error(body?.error ?? error.message)
+  }
   return data as WorkoutPlan
 }
 
@@ -85,6 +94,9 @@ export async function getSessionFeedback(sessionId: string): Promise<SessionFeed
     body: { currentSession, previousSessions, prs: prsWithNames }
   })
 
-  if (error) throw error
+  if (error) {
+    const body = await (error as any).context?.json?.().catch(() => null)
+    throw new Error(body?.error ?? error.message)
+  }
   return data as SessionFeedback
 }

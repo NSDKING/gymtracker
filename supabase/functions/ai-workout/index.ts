@@ -107,7 +107,7 @@ Respond with JSON only, no markdown, in this exact format:
 
     const message = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
+      max_tokens: 4096,
       system: 'You are a precision strength coach. Always respond with valid JSON only.',
       messages: [{ role: 'user', content: prompt }],
     })
