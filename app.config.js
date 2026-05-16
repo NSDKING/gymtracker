@@ -7,6 +7,12 @@ export default {
     version: '1.5.0',
     orientation: 'portrait',
     scheme: IS_DEV ? 'gymtracker' : 'repd',
+    updates: {
+      url: 'https://u.expo.dev/93bab97e-1442-460d-a1ef-4cd08a6a04a9',
+    },
+    runtimeVersion: {
+      policy: 'appVersion',
+    },
     icon: './assets/images/iconV1.png',
     splash: {
       image: './assets/images/splashV1.png',
