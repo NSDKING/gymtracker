@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { useStore, Session, Exercise } from '../store'
+import { useStore, Session, Exercise, WorkoutPlan } from '../store'
 
 // Merge local + cloud data by ID (union, no duplicates, no data loss)
 export async function syncWithSupabase() {
@@ -85,10 +85,44 @@ export async function syncWithSupabase() {
     }
   }
 
+  // --- Push local workout plan ---
+  const { activeProgram, planGeneratedAt, planStartDate, weeklySchedule } = useStore.getState()
+  if (activeProgram) {
+    await saveWorkoutPlanToSupabase(activeProgram, {
+      generatedAt: planGeneratedAt ?? undefined,
+      planStartDate: planStartDate ?? undefined,
+      weeklySchedule: weeklySchedule ?? undefined,
+    })
+  }
+
+  // --- Pull cloud workout plan ---
+  const cloudPlan = await loadWorkoutPlanFromSupabase()
+  let resolvedPlan = activeProgram
+  let resolvedGeneratedAt = planGeneratedAt
+  let resolvedPlanStartDate = planStartDate
+  let resolvedWeeklySchedule = weeklySchedule
+
+  if (cloudPlan) {
+    const localTime = planGeneratedAt ? new Date(planGeneratedAt).getTime() : 0
+    const cloudTime = new Date(cloudPlan.generatedAt).getTime()
+    if (!activeProgram || cloudTime > localTime) {
+      resolvedPlan = cloudPlan.plan
+      resolvedGeneratedAt = cloudPlan.generatedAt
+      resolvedPlanStartDate = cloudPlan.planStartDate ?? null
+      resolvedWeeklySchedule = cloudPlan.weeklySchedule ?? null
+    }
+  }
+
   useStore.setState({
     exercises: mergedExercises,
     sessions: mergedSessions,
     syncEnabled: true,
+    ...(resolvedPlan ? {
+      activeProgram: resolvedPlan,
+      planGeneratedAt: resolvedGeneratedAt,
+      planStartDate: resolvedPlanStartDate,
+      weeklySchedule: resolvedWeeklySchedule,
+    } : {}),
   })
 }
 
@@ -100,4 +134,52 @@ export async function pullFromSupabase() {
 // Push all local data to Supabase (called once when user first upgrades)
 export async function pushLocalToSupabase() {
   return syncWithSupabase()
+}
+
+export async function saveWorkoutPlanToSupabase(
+  plan: WorkoutPlan,
+  opts: {
+    userModified?: boolean
+    generatedAt?: string
+    planStartDate?: string
+    weeklySchedule?: number[]
+  } = {}
+) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase.from('workout_plans').upsert(
+    {
+      user_id: user.id,
+      plan,
+      generated_at: opts.generatedAt ?? new Date().toISOString(),
+      user_modified: opts.userModified ?? false,
+      updated_at: new Date().toISOString(),
+      plan_start_date: opts.planStartDate ?? null,
+      weekly_schedule: opts.weeklySchedule ?? null,
+    },
+    { onConflict: 'user_id' }
+  )
+}
+
+export async function loadWorkoutPlanFromSupabase(): Promise<{
+  plan: WorkoutPlan
+  generatedAt: string
+  userModified: boolean
+  planStartDate?: string
+  weeklySchedule?: number[]
+} | null> {
+  const { data } = await supabase
+    .from('workout_plans')
+    .select('plan, generated_at, user_modified, plan_start_date, weekly_schedule')
+    .maybeSingle()
+
+  if (!data) return null
+  return {
+    plan: data.plan as WorkoutPlan,
+    generatedAt: data.generated_at,
+    userModified: data.user_modified,
+    planStartDate: data.plan_start_date ?? undefined,
+    weeklySchedule: data.weekly_schedule ?? undefined,
+  }
 }

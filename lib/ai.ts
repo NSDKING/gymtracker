@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { useStore, getPRs } from '../store'
 import type { WorkoutPlan } from '../store'
+import { saveWorkoutPlanToSupabase } from './sync'
 export type { WorkoutPlan } from '../store'
 
 export type AIRecommendation = {
@@ -60,7 +61,7 @@ export async function getAIRecommendation(photoBase64?: string): Promise<AIRecom
 }
 
 export async function generateAIWorkout(goal: string, daysPerWeek: number, feedback?: string): Promise<WorkoutPlan> {
-  const { sessions, exercises, experienceLevel, equipment, focusMuscles, injuries } = useStore.getState()
+  const { sessions, exercises, experienceLevel, equipment, focusMuscles, injuries, syncEnabled } = useStore.getState()
 
   const { data, error } = await supabase.functions.invoke('ai-workout', {
     body: { sessions, exercises, goal, daysPerWeek, experienceLevel, equipment, focusMuscles, injuries, feedback }
@@ -70,7 +71,15 @@ export async function generateAIWorkout(goal: string, daysPerWeek: number, feedb
     const body = await (error as any).context?.json?.().catch(() => null)
     throw new Error(body?.error ?? error.message)
   }
-  return data as WorkoutPlan
+
+  const plan = data as WorkoutPlan
+  const generatedAt = new Date().toISOString()
+  useStore.getState().setPlanGeneratedAt(generatedAt)
+  if (syncEnabled) {
+    saveWorkoutPlanToSupabase(plan, { generatedAt }).catch(() => {})
+  }
+
+  return plan
 }
 
 export async function getSessionFeedback(sessionId: string): Promise<SessionFeedback> {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Alert
@@ -11,12 +11,17 @@ import { ACCENT, CARD, BORDER, MUTED, DIM } from '../constants/theme'
 
 const GOALS = ['Build muscle', 'Increase strength', 'Lose fat', 'Improve endurance', 'General fitness']
 const DAYS = [2, 3, 4, 5, 6]
+const STALE_DAYS = 7
 
 export default function AIWorkoutScreen() {
   const insets = useSafeAreaInsets()
-  const { goal: storeGoal, daysPerWeek: storeDays, pendingPlan, setPendingPlan, activeProgram, isPro } = useStore()
+  const {
+    goal: storeGoal, daysPerWeek: storeDays,
+    pendingPlan, setPendingPlan, activeProgram,
+    planGeneratedAt, isPro,
+  } = useStore()
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!isPro) router.replace('/paywall')
   }, [isPro])
 
@@ -24,6 +29,10 @@ export default function AIWorkoutScreen() {
   const [daysPerWeek, setDaysPerWeek] = useState(storeDays || 4)
   const [loading, setLoading] = useState(false)
   const [plan, setPlan] = useState(pendingPlan || activeProgram)
+
+  const planAgeMs = planGeneratedAt ? Date.now() - new Date(planGeneratedAt).getTime() : Infinity
+  const planAgeDays = Math.floor(planAgeMs / (1000 * 60 * 60 * 24))
+  const isFresh = planAgeDays < STALE_DAYS
 
   const handleGenerate = async () => {
     try {
@@ -77,6 +86,17 @@ export default function AIWorkoutScreen() {
           ))}
         </View>
 
+        {/* Plan freshness banner */}
+        {plan && !loading && (
+          <View style={[styles.freshBanner, isFresh ? styles.freshBannerOk : styles.freshBannerStale]}>
+            <Text style={[styles.freshTxt, isFresh ? styles.freshTxtOk : styles.freshTxtStale]}>
+              {isFresh
+                ? `Plan is ${planAgeDays === 0 ? 'fresh' : `${planAgeDays}d old`} — regenerate in ${STALE_DAYS - planAgeDays}d`
+                : `Plan is ${planAgeDays}d old — time for a new one`}
+            </Text>
+          </View>
+        )}
+
         {/* Generate button */}
         <TouchableOpacity
           style={[styles.generateBtn, loading && { opacity: 0.6 }]}
@@ -86,7 +106,7 @@ export default function AIWorkoutScreen() {
           {loading
             ? <ActivityIndicator color="#000" />
             : <Text style={styles.generateTxt}>
-                {plan ? '🔄 Regenerate Plan' : '✨ Generate My Plan'}
+                {plan ? (isFresh ? '↻ Regenerate Plan' : '✨ Generate New Plan') : '✨ Generate My Plan'}
               </Text>
           }
         </TouchableOpacity>
@@ -151,7 +171,13 @@ const styles = StyleSheet.create({
   dayBtnActive: { backgroundColor: ACCENT, borderColor: ACCENT },
   dayBtnTxt: { fontSize: 16, fontWeight: '700', color: MUTED },
   dayBtnTxtActive: { color: '#000' },
-  generateBtn: { margin: 16, marginTop: 24, backgroundColor: ACCENT, borderRadius: 13, height: 52, alignItems: 'center', justifyContent: 'center' },
+  freshBanner: { marginHorizontal: 16, marginTop: 16, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1 },
+  freshBannerOk: { backgroundColor: 'rgba(200,240,101,0.06)', borderColor: 'rgba(200,240,101,0.2)' },
+  freshBannerStale: { backgroundColor: 'rgba(255,159,10,0.08)', borderColor: 'rgba(255,159,10,0.3)' },
+  freshTxt: { fontSize: 12, fontWeight: '600' },
+  freshTxtOk: { color: ACCENT },
+  freshTxtStale: { color: '#ff9f0a' },
+  generateBtn: { margin: 16, marginTop: 16, backgroundColor: ACCENT, borderRadius: 13, height: 52, alignItems: 'center', justifyContent: 'center' },
   generateTxt: { fontSize: 16, fontWeight: '800', color: '#000' },
   loadingHint: { textAlign: 'center', color: MUTED, fontSize: 13, marginTop: 8 },
   planWrap: { paddingHorizontal: 16, gap: 12, marginTop: 8 },

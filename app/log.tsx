@@ -11,6 +11,7 @@ import type { SessionEntry, Exercise } from '@/store/index'
 import { syncAddSession } from '@/lib/sync-hooks'
 import EntryCard from '@/components/log/EntryCard'
 import type { DraftSet, DraftEntry } from '@/components/log/EntryCard'
+import RestTimer from '@/components/log/RestTimer'
 import ExercisePickerSheet from '@/components/log/ExercisePickerSheet'
 import { ACCENT, CARD, BORDER, MUTED, DIM } from '@/constants/theme'
 
@@ -144,6 +145,9 @@ export default function LogScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Rest timer — always visible, collapsed by default */}
+        <RestTimer />
+
         {entries.length === 0 && (
           <View style={styles.empty}>
             <Text style={styles.emptyIcon}>🏋️</Text>

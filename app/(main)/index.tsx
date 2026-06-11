@@ -2,23 +2,45 @@ import React, { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator, Alert } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
-import { useStore, getPRs, getStreak, getTotalVolume } from '../../store/index'
+import { useStore, getPRs, getStreak, getTotalVolume, getScheduleInfo, generateDefaultWeeklySchedule } from '../../store/index'
 import { generateAIWorkout } from '../../lib/ai'
+import { scheduleWeeklyReminders } from '../../lib/notifications'
 import Heatmap from '../../components/Heatmap'
 import WeeklyBars from '../../components/dashboard/WeeklyBars'
 import StatGrid from '../../components/dashboard/StatGrid'
 import PillNav from '../../components/dashboard/PillNav'
 import PRList from '../../components/dashboard/PRList'
 import TodayWorkout from '../../components/dashboard/TodayWorkout'
+import PlanAnalysisModal from '../../components/dashboard/PlanAnalysisModal'
 import { ACCENT, CARD, BORDER, MUTED } from '@/constants/theme'
- 
+
 
 export default function Dashboard() {
   const insets = useSafeAreaInsets()
-  const { sessions, exercises, isPro, pendingPlan, setActiveProgram, setPendingPlan, activeProgram, goal, daysPerWeek } = useStore()
+  const {
+    sessions, exercises, isPro,
+    pendingPlan, setPendingPlan,
+    activeProgram, goal, daysPerWeek,
+    activateNewProgram, weeklySchedule, planStartDate,
+    notificationsEnabled, reminderHour,
+  } = useStore()
   const [showSwap, setShowSwap] = useState(false)
   const [swapFeedback, setSwapFeedback] = useState('')
   const [swapLoading, setSwapLoading] = useState(false)
+  const [showAnalysis, setShowAnalysis] = useState(false)
+  const [skippedRest, setSkippedRest] = useState(false)
+
+  const handleValidatePlan = () => {
+    if (!pendingPlan) return
+    activateNewProgram(pendingPlan, daysPerWeek)
+    if (notificationsEnabled) {
+      const newSchedule = generateDefaultWeeklySchedule(daysPerWeek)
+      scheduleWeeklyReminders(newSchedule, pendingPlan.days, reminderHour).catch(() => {})
+    }
+    setPendingPlan(null)
+    setShowSwap(false)
+    setSkippedRest(false)
+  }
 
   const handleSwap = async (feedback?: string) => {
     if (!isPro) { router.push('/paywall'); return }
@@ -34,6 +56,7 @@ export default function Dashboard() {
       setSwapLoading(false)
     }
   }
+
   const prs = getPRs(sessions, exercises)
   const streak = getStreak(sessions)
   const totalVol = sessions.reduce((t, s) => t + getTotalVolume(s.entries), 0)
@@ -55,6 +78,22 @@ export default function Dashboard() {
 
   const monthLabel = today.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
 
+  // Compute today's scheduled workout
+  const planDaysCount = activeProgram?.days.length ?? 0
+  const { today: todayResult, nextWorkout: nextWorkoutIdx } = getScheduleInfo(
+    weeklySchedule,
+    planStartDate,
+    planDaysCount,
+    sessions.length,
+  )
+
+  const isRestDay = todayResult === 'rest' && !skippedRest
+  const activeDayIndex = isRestDay
+    ? 0  // won't be used (rest card shown instead)
+    : skippedRest
+      ? nextWorkoutIdx
+      : (todayResult as number)
+
   return (
     <ScrollView
       style={styles.screen}
@@ -67,7 +106,7 @@ export default function Dashboard() {
           <Text style={styles.title}>Dashboard</Text>
           <Text style={styles.sub}>{monthLabel}</Text>
         </View>
-   
+
       </View>
 
       <PillNav />
@@ -88,7 +127,7 @@ export default function Dashboard() {
           <View style={styles.pendingPlanActions}>
             <TouchableOpacity
               style={styles.acceptBtn}
-              onPress={() => { setActiveProgram(pendingPlan); setPendingPlan(null); setShowSwap(false) }}
+              onPress={handleValidatePlan}
             >
               <Text style={styles.acceptBtnTxt}>Validate ✓</Text>
             </TouchableOpacity>
@@ -157,7 +196,10 @@ export default function Dashboard() {
       {activeProgram && activeProgram.days.length > 0 ? (
         <TodayWorkout
           program={activeProgram}
-          dayIndex={sessions.length % activeProgram.days.length}
+          dayIndex={activeDayIndex}
+          isRestDay={isRestDay}
+          onSkipRest={() => setSkippedRest(true)}
+          onAnalyze={() => setShowAnalysis(true)}
         />
       ) : (
         <TouchableOpacity style={styles.aiCard} onPress={() => router.push('/ai-recommend')} activeOpacity={0.85}>
@@ -168,6 +210,19 @@ export default function Dashboard() {
           <Text style={styles.aiCardArrow}>→</Text>
         </TouchableOpacity>
       )}
+
+      {/* AI coach analysis — only when a program is active (Pro) */}
+      {activeProgram && isPro && (
+        <TouchableOpacity style={styles.analyseCard} onPress={() => setShowAnalysis(true)} activeOpacity={0.85}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.analyseTitle}>Coach Analysis</Text>
+            <Text style={styles.analyseSub}>AI feedback on your current training & imbalances</Text>
+          </View>
+          <Text style={styles.analyseArrow}>→</Text>
+        </TouchableOpacity>
+      )}
+
+      <PlanAnalysisModal visible={showAnalysis} onClose={() => setShowAnalysis(false)} />
 
       {/* Recent PRs */}
       <View style={styles.sectionRow}>
@@ -191,7 +246,7 @@ export default function Dashboard() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000', 
+  screen: { flex: 1, backgroundColor: '#000',
     paddingTop: 40 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
@@ -281,4 +336,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   swapApplyTxt: { fontSize: 13, fontWeight: '700', color: '#000' },
+  analyseCard: {
+    marginHorizontal: 14, marginBottom: 16,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: 14, padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+  },
+  analyseTitle: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 3 },
+  analyseSub: { fontSize: 12, color: MUTED, lineHeight: 16 },
+  analyseArrow: { fontSize: 20, fontWeight: '700', color: MUTED },
 })

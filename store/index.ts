@@ -40,6 +40,14 @@ type Store = {
   activeProgram: WorkoutPlan | null
   pendingPlan: WorkoutPlan | null
   pendingAdaptation: boolean
+  planGeneratedAt: string | null
+  // Weekly schedule: 7-element array [Mon..Sun], -1=rest, 0..N=workout slot index
+  weeklySchedule: number[] | null
+  // ISO date string (YYYY-MM-DD) when the active program was activated
+  planStartDate: string | null
+  // Notification preferences (persisted)
+  notificationsEnabled: boolean
+  reminderHour: number  // 0-23, default 8
   addExercise: (name: string, muscle: string) => Exercise
   editExercise: (id: string, name: string, muscle: string) => void
   removeExercise: (id: string) => void
@@ -59,6 +67,13 @@ type Store = {
   setActiveProgram: (plan: WorkoutPlan | null) => void
   setPendingPlan: (plan: WorkoutPlan | null) => void
   setPendingAdaptation: (v: boolean) => void
+  setPlanGeneratedAt: (v: string | null) => void
+  setWeeklySchedule: (v: number[] | null) => void
+  setPlanStartDate: (v: string | null) => void
+  setNotificationsEnabled: (v: boolean) => void
+  setReminderHour: (v: number) => void
+  // Activates a brand-new plan: resets schedule and start date
+  activateNewProgram: (plan: WorkoutPlan, daysPerWeek: number) => void
 }
 
 const uuid = () => Math.random().toString(36).slice(2) + Date.now().toString(36)
@@ -85,6 +100,11 @@ export const useStore = create<Store>()(
       activeProgram: null,
       pendingPlan: null,
       pendingAdaptation: false,
+      planGeneratedAt: null,
+      weeklySchedule: null,
+      planStartDate: null,
+      notificationsEnabled: false,
+      reminderHour: 8,
 
       addExercise: (name, muscle) => {
         const ex: Exercise = { id: uuid(), name, muscle }
@@ -155,6 +175,22 @@ export const useStore = create<Store>()(
       setActiveProgram: (plan) => set({ activeProgram: plan, pendingAdaptation: false }),
       setPendingPlan: (plan) => set({ pendingPlan: plan }),
       setPendingAdaptation: (v) => set({ pendingAdaptation: v }),
+      setPlanGeneratedAt: (v) => set({ planGeneratedAt: v }),
+      setWeeklySchedule: (v) => set({ weeklySchedule: v }),
+      setPlanStartDate: (v) => set({ planStartDate: v }),
+      setNotificationsEnabled: (v) => set({ notificationsEnabled: v }),
+      setReminderHour: (v) => set({ reminderHour: v }),
+
+      activateNewProgram: (plan, daysPerWeek) => {
+        const today = new Date().toISOString().slice(0, 10)
+        const schedule = generateDefaultWeeklySchedule(daysPerWeek)
+        set({
+          activeProgram: plan,
+          pendingAdaptation: false,
+          planStartDate: today,
+          weeklySchedule: schedule,
+        })
+      },
     }),
     {
       name: 'repd-storage',
@@ -162,6 +198,80 @@ export const useStore = create<Store>()(
     }
   )
 )
+
+// Returns a 7-element schedule [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+// Each value: -1 = rest day, 0..N-1 = workout slot index within the week
+export function generateDefaultWeeklySchedule(daysPerWeek: number): number[] {
+  switch (daysPerWeek) {
+    case 2: return [0, -1, -1, 1, -1, -1, -1]    // Mon, Thu
+    case 3: return [0, -1, 1, -1, 2, -1, -1]      // Mon, Wed, Fri
+    case 4: return [0, 1, -1, 2, 3, -1, -1]        // Mon, Tue, Thu, Fri
+    case 5: return [0, 1, 2, 3, 4, -1, -1]          // Mon–Fri
+    case 6: return [0, 1, 2, 3, 4, 5, -1]           // Mon–Sat
+    default: return [0, 1, -1, 2, 3, -1, -1]
+  }
+}
+
+export type ScheduleInfo = {
+  today: number | 'rest'
+  // The next upcoming workout's plan day index (used to skip rest day)
+  nextWorkout: number
+}
+
+// Determines today's plan day index and the next upcoming workout.
+// Falls back to sessions.length % planDaysCount when schedule data is missing (old plans).
+export function getScheduleInfo(
+  weeklySchedule: number[] | null,
+  planStartDate: string | null,
+  planDaysCount: number,
+  fallbackSessionCount: number,
+): ScheduleInfo {
+  if (!weeklySchedule || !planStartDate || planDaysCount === 0) {
+    const idx = planDaysCount > 0 ? fallbackSessionCount % planDaysCount : 0
+    return { today: idx, nextWorkout: (idx + 1) % Math.max(planDaysCount, 1) }
+  }
+
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const dayOfWeek = (now.getDay() + 6) % 7  // Mon=0 .. Sun=6
+
+  // Find Monday of the week planStartDate falls in
+  const startDate = new Date(planStartDate)
+  startDate.setHours(0, 0, 0, 0)
+  const startDow = (startDate.getDay() + 6) % 7  // Mon=0
+  const planWeekStart = new Date(startDate)
+  planWeekStart.setDate(startDate.getDate() - startDow)
+
+  const activeSlotsPerWeek = weeklySchedule.filter(s => s >= 0).length || 1
+
+  const computePlanDay = (targetDate: Date, slot: number): number => {
+    const daysSince = Math.floor((targetDate.getTime() - planWeekStart.getTime()) / 86400000)
+    const weeksSince = Math.floor(daysSince / 7)
+    return (weeksSince * activeSlotsPerWeek + slot) % planDaysCount
+  }
+
+  // Find next workout slot (starting from tomorrow)
+  let nextSlot = -1
+  let daysAhead = 1
+  while (daysAhead <= 7) {
+    const nextDow = (dayOfWeek + daysAhead) % 7
+    if (weeklySchedule[nextDow] >= 0) {
+      nextSlot = weeklySchedule[nextDow]
+      break
+    }
+    daysAhead++
+  }
+  const nextWorkoutDate = new Date(now)
+  nextWorkoutDate.setDate(now.getDate() + daysAhead)
+  const nextWorkout = nextSlot >= 0 ? computePlanDay(nextWorkoutDate, nextSlot) : 0
+
+  const todaySlot = weeklySchedule[dayOfWeek]
+  if (todaySlot === -1) {
+    return { today: 'rest', nextWorkout }
+  }
+
+  return { today: computePlanDay(now, todaySlot), nextWorkout }
+}
 
 export function getTotalVolume(entries: SessionEntry[]): number {
   return entries.reduce((total, entry) =>

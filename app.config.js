@@ -30,6 +30,16 @@ export default {
     android: {
       package: IS_DEV ? 'com.yourname.repd.dev' : 'com.yourname.repd',
     },
+    plugins: [
+      [
+        'expo-notifications',
+        {
+          color: '#C8F065',
+          // Android notification channel for workout reminders
+          defaultChannel: 'workout',
+        },
+      ],
+    ],
     owner: 'dimis',
     extra: {
       eas: {

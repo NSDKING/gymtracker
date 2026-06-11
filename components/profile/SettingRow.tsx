@@ -4,6 +4,7 @@ import { ACCENT, BORDER, MUTED, DIM, RED } from '../../constants/theme'
 
 type Props = {
   label: string
+  subtitle?: string
   value?: string
   toggle?: boolean
   toggleValue?: boolean
@@ -13,7 +14,7 @@ type Props = {
 }
 
 export default function SettingRow({
-  label, value, toggle, toggleValue, onToggle, onPress, danger
+  label, subtitle, value, toggle, toggleValue, onToggle, onPress, danger
 }: Props) {
   return (
     <TouchableOpacity
@@ -22,7 +23,10 @@ export default function SettingRow({
       activeOpacity={onPress ? 0.7 : 1}
       disabled={!onPress && !toggle}
     >
-      <Text style={[styles.label, danger && { color: RED }]}>{label}</Text>
+      <View style={styles.labelWrap}>
+        <Text style={[styles.label, danger && { color: RED }]}>{label}</Text>
+        {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      </View>
       <View style={styles.right}>
         {value && <Text style={styles.value}>{value}</Text>}
         {toggle && (
@@ -47,7 +51,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14,
   },
+  labelWrap: { flex: 1, gap: 2 },
   label: { fontSize: 14, color: '#fff' },
+  subtitle: { fontSize: 11, color: MUTED, lineHeight: 15 },
   right: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   value: { fontSize: 13, color: MUTED },
   arrow: { fontSize: 18, color: DIM, lineHeight: 20 },

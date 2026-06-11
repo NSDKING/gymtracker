@@ -12,9 +12,9 @@ import { BORDER, DIM, ACCENT } from '@/constants/theme'
 import { supabase } from '@/lib/supabase'
 import { exportToCSV } from '@/lib/export'
 import { syncWithSupabase } from '@/lib/sync'
-
 import {
   requestNotificationPermissions,
+  scheduleWeeklyReminders,
   scheduleWorkoutReminder,
   cancelWorkoutReminder,
   scheduleWeeklySummary,
@@ -47,17 +47,21 @@ const proGateStyles = StyleSheet.create({
   badgeText: { fontSize: 10, fontWeight: '800', color: '#000' },
 })
 
+const REMINDER_HOURS = [6, 7, 8, 9, 10, 12, 17, 18, 19, 20]
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
-  const { sessions, exercises, isPro, isLoggedIn } = useStore()
+  const {
+    sessions, exercises, isPro,
+    activeProgram, weeklySchedule,
+    notificationsEnabled, reminderHour,
+    setNotificationsEnabled, setReminderHour,
+  } = useStore()
 
-  const [weightUnit, setWeightUnit] = useState<'kg' | 'lbs'>('kg')
-  const [reminders, setReminders] = useState(true)
-  const [prAlerts, setPrAlerts] = useState(true)
   const [weeklySummary, setWeeklySummary] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [showHourPicker, setShowHourPicker] = useState(false)
 
   const totalVol = sessions.reduce((t, s) => t + getTotalVolume(s.entries), 0)
   const streak = getStreak(sessions)
@@ -68,27 +72,46 @@ export default function ProfileScreen() {
   )
 
   const handleReminders = async (val: boolean) => {
-  if (!isPro) { router.push('/paywall'); return }
-  const granted = await requestNotificationPermissions()
-  if (!granted) {
-    Alert.alert('Permission needed', 'Enable notifications in your iPhone Settings to use this feature.')
-    return
+    const granted = await requestNotificationPermissions()
+    if (!granted) {
+      Alert.alert('Permission needed', 'Enable notifications in Settings to use this feature.')
+      return
+    }
+    if (val) {
+      // Use plan-aware schedule if a plan is active, otherwise basic daily reminder
+      if (activeProgram && weeklySchedule) {
+        await scheduleWeeklyReminders(weeklySchedule, activeProgram.days, reminderHour)
+      } else {
+        await scheduleWorkoutReminder(reminderHour)
+      }
+    } else {
+      await cancelWorkoutReminder()
+    }
+    setNotificationsEnabled(val)
   }
-  if (val) await scheduleWorkoutReminder(9)
-  else await cancelWorkoutReminder()
-  setReminders(val)
-}
 
-const handleWeeklySummary = async (val: boolean) => {
-  if (!isPro) { router.push('/paywall'); return }
-  const granted = await requestNotificationPermissions()
-  if (!granted) {
-    Alert.alert('Permission needed', 'Enable notifications in your iPhone Settings to use this feature.')
-    return
+  const handleReminderHour = async (hour: number) => {
+    setReminderHour(hour)
+    setShowHourPicker(false)
+    if (notificationsEnabled) {
+      // Reschedule with new hour
+      if (activeProgram && weeklySchedule) {
+        await scheduleWeeklyReminders(weeklySchedule, activeProgram.days, hour)
+      } else {
+        await scheduleWorkoutReminder(hour)
+      }
+    }
   }
-  if (val) await scheduleWeeklySummary()
-  setWeeklySummary(val)
-}
+
+  const handleWeeklySummary = async (val: boolean) => {
+    const granted = await requestNotificationPermissions()
+    if (!granted) {
+      Alert.alert('Permission needed', 'Enable notifications in Settings to use this feature.')
+      return
+    }
+    if (val) await scheduleWeeklySummary()
+    setWeeklySummary(val)
+  }
 
   const firstSession = sessions.length
     ? [...sessions].sort((a, b) => a.date.localeCompare(b.date))[0]
@@ -188,6 +211,12 @@ const handleWeeklySummary = async (val: boolean) => {
     )
   }
 
+  const hourLabel = (h: number) => {
+    const suffix = h >= 12 ? 'PM' : 'AM'
+    const display = h % 12 === 0 ? 12 : h % 12
+    return `${display}:00 ${suffix}`
+  }
+
   return (
     <ScrollView
       style={styles.screen}
@@ -225,22 +254,6 @@ const handleWeeklySummary = async (val: boolean) => {
         </View>
       )}
 
-      <Section title="Preferences">
-        <SettingRow
-          label="Workout Reminders"
-          toggle
-          toggleValue={reminders}
-          onToggle={handleReminders}
-        />
-        <View style={styles.divider} />
-        <SettingRow
-          label="Weekly Summary"
-          toggle
-          toggleValue={weeklySummary}
-          onToggle={handleWeeklySummary}
-        />
-      </Section>
-
       {/* Pro Features Section */}
       <Section title="Pro Features">
         <ProGate isPro={isPro}>
@@ -277,32 +290,49 @@ const handleWeeklySummary = async (val: boolean) => {
       </Section>
 
       <Section title="Notifications">
-        <ProGate isPro={isPro}>
-          <SettingRow
-            label="Workout Reminders"
-            toggle
-            toggleValue={reminders}
-            onToggle={isPro ? setReminders : () => router.push('/paywall')}
-          />
-        </ProGate>
+        <SettingRow
+          label="Workout & Rest-Day Reminders"
+          subtitle={notificationsEnabled
+            ? `Daily at ${hourLabel(reminderHour)} · gym & rest days`
+            : 'Remind me on gym and rest days'}
+          toggle
+          toggleValue={notificationsEnabled}
+          onToggle={handleReminders}
+        />
+        {notificationsEnabled && (
+          <>
+            <View style={styles.divider} />
+            <SettingRow
+              label="Reminder Time"
+              value={hourLabel(reminderHour)}
+              onPress={() => setShowHourPicker(v => !v)}
+            />
+            {showHourPicker && (
+              <View style={styles.hourGrid}>
+                {REMINDER_HOURS.map(h => (
+                  <TouchableOpacity
+                    key={h}
+                    style={[styles.hourBtn, reminderHour === h && styles.hourBtnActive]}
+                    onPress={() => handleReminderHour(h)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.hourTxt, reminderHour === h && styles.hourTxtActive]}>
+                      {hourLabel(h)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </>
+        )}
         <View style={styles.divider} />
-        <ProGate isPro={isPro}>
-          <SettingRow
-            label="PR Alerts"
-            toggle
-            toggleValue={prAlerts}
-            onToggle={isPro ? setPrAlerts : () => router.push('/paywall')}
-          />
-        </ProGate>
-        <View style={styles.divider} />
-        <ProGate isPro={isPro}>
-          <SettingRow
-            label="Weekly Summary"
-            toggle
-            toggleValue={weeklySummary}
-            onToggle={isPro ? setWeeklySummary : () => router.push('/paywall')}
-          />
-        </ProGate>
+        <SettingRow
+          label="Weekly Summary"
+          subtitle="Sunday evening recap"
+          toggle
+          toggleValue={weeklySummary}
+          onToggle={handleWeeklySummary}
+        />
       </Section>
 
       <Section title="Data">
@@ -316,12 +346,12 @@ const handleWeeklySummary = async (val: boolean) => {
         <SettingRow label="Personal Records" value={`${prCount}`} />
       </Section>
 
-        <Section title="Account">
-          <SettingRow label="Sign Out" onPress={handleSignOut} danger />
-          <View style={styles.divider} />
-          <SettingRow label="Delete Account" onPress={handleDeleteAccount} danger />
-        </Section>
-        
+      <Section title="Account">
+        <SettingRow label="Sign Out" onPress={handleSignOut} danger />
+        <View style={styles.divider} />
+        <SettingRow label="Delete Account" onPress={handleDeleteAccount} danger />
+      </Section>
+
       <Section title="About">
         <SettingRow label="Version" value="1.0.0" />
         <View style={styles.divider} />
@@ -351,27 +381,32 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: BORDER, marginHorizontal: 14 },
   footer: { textAlign: 'center', fontSize: 11, color: DIM, paddingVertical: 24 },
   proBanner: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: ACCENT,
-    borderRadius: 14,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    marginHorizontal: 16, marginBottom: 16,
+    backgroundColor: ACCENT, borderRadius: 14, padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
   },
   proBannerTitle: { fontSize: 15, fontWeight: '700', color: '#000', marginBottom: 2 },
   proBannerSub: { fontSize: 12, color: 'rgba(0,0,0,0.6)' },
   proBannerArrow: { fontSize: 20, fontWeight: '700', color: '#000' },
   proActiveBadge: {
-    marginHorizontal: 16,
-    marginBottom: 16,
+    marginHorizontal: 16, marginBottom: 16,
     backgroundColor: 'rgba(200,240,101,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(200,240,101,0.3)',
-    borderRadius: 14,
-    padding: 12,
-    alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(200,240,101,0.3)',
+    borderRadius: 14, padding: 12, alignItems: 'center',
   },
   proActiveText: { fontSize: 13, fontWeight: '700', color: ACCENT },
+  hourGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  hourBtn: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  hourBtnActive: {
+    backgroundColor: 'rgba(200,240,101,0.1)',
+    borderColor: 'rgba(200,240,101,0.4)',
+  },
+  hourTxt: { fontSize: 13, fontWeight: '600', color: DIM },
+  hourTxtActive: { color: ACCENT },
 })
